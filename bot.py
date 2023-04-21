@@ -90,6 +90,9 @@ async def generate_messagehistory(channel: discord.TextChannel):
     print("Reading message history")
     messages = []
     async for message in channel.history(limit=None, oldest_first=True):
+        # ignore messages starting with !!
+        if message.content.startswith("!!"):
+            continue
         # check user or bot
         if message.author.id == client.user.id:
             messages.append(
@@ -109,6 +112,9 @@ def ignoreMessage(message: discord.Message) -> bool:
     '''Checks for bot account,
     chat inside certain guild with category,
     aswell as system prompt'''
+    if message.content.startswith("!!"):
+        print("Ignore specified")
+        return True
     if message.author.bot or message.author.id == client.user.id:
         print("Bot detected")
         return True
