@@ -65,10 +65,15 @@ async def send_message_blocks(channel: discord.TextChannel, content: str):
             while len(current_block) > 1996:  # leave space for closing brackets
                 current_block = current_block[:codeblock_start].rsplit(
                     "\n", 1)[0]  # split on last new line
+
+            # gather language code if possible
+            opening_bracket_index = current_block.rfind("```") + 3
+            language_code = current_block[opening_bracket_index:].split("\n")[
+                0].split(" ")[0]
             # add closing code brackets
             current_block = current_block + "```"
             # add opening brackets to remaining content
-            remaining_content = "```" + \
+            remaining_content = "```" + language_code + \
                 remaining_content[len(current_block) - 3:]
         # cut neatly on last period
         else:
