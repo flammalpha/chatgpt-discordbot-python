@@ -34,21 +34,26 @@ async def on_message(message: discord.Message):
 
     print("Working...")
     async with message.channel.typing():
-        # generate ChatGPT prompt
-        message_history = await generate_messagehistory(message.channel)
-        response = await chatgpt.get_response_async(message_history)
+        try:
+            # generate ChatGPT prompt
+            message_history = await generate_messagehistory(message.channel)
+            response = await chatgpt.get_response_async(message_history)
 
-        # check if user is in voice -> generate TTS if funds available
-        if message.author.voice and message.author.voice.channel:
-            # message.author.voice.channel.connect()
-            if elevenlabs.get_character_remaining() > response:
-                # generate voice
-                pass
-            else:
-                # say not enough funds
-                pass
-
-    await send_message_blocks(message.channel, response)
+            # check if user is in voice -> generate TTS if funds available
+            if message.author.voice and message.author.voice.channel:
+                # message.author.voice.channel.connect()
+                if elevenlabs.get_character_remaining() > response:
+                    # generate voice
+                    pass
+                else:
+                    # say not enough funds
+                    pass
+        except Exception as e:
+            error_embed = discord.Embed(
+                title="Error", description=f"```{str(e)}```", color=discord.Color.red())
+            await message.channel.send(embed=error_embed)
+    if response is not None:
+        await send_message_blocks(message.channel, response)
 
 
 async def send_message_blocks(channel: discord.TextChannel, content: str):
