@@ -36,7 +36,7 @@ async def on_message(message: discord.Message):
     async with message.channel.typing():
         # generate ChatGPT prompt
         message_history = await generate_messagehistory(message.channel)
-        response = chatgpt.get_response(message_history)
+        response = await chatgpt.get_response_async(message_history)
 
         # check if user is in voice -> generate TTS if funds available
         if message.author.voice and message.author.voice.channel:
@@ -47,7 +47,7 @@ async def on_message(message: discord.Message):
             else:
                 # say not enough funds
                 pass
-        await message.channel.send(response)
+    await message.channel.send(response)
 
 
 async def generate_messagehistory(channel: discord.TextChannel):
