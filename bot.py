@@ -124,7 +124,7 @@ def ignore_message(message: discord.Message) -> bool:
         print("Bot detected")
         return True
     if message.guild is None or message.guild.id != guild_id:
-        print(f"Wrong guild {message.guild.id} but expected {guild_id}")
+        print(f"Wrong or no guild")
         return True
     if message.channel.category is None or message.channel.category.id != category_id:
         print("Not in Category")
