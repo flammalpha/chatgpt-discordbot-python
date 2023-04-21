@@ -47,7 +47,38 @@ async def on_message(message: discord.Message):
             else:
                 # say not enough funds
                 pass
-    await message.channel.send(response)
+
+    await send_message_blocks(message.channel, response)
+
+
+async def send_message_blocks(channel: discord.TextChannel, content: str):
+    remaining_content = content
+    while len(remaining_content) > 2000:
+        current_block = remaining_content[:1999]
+        # check for codeblock then cut neatly on a line inside block
+        if current_block.count("```") % 2 > 0:
+            codeblock_start = current_block.rfind(
+                "```")  # last opened codeblock
+            # check if not first / opening bracket
+            if current_block[:codeblock_start].rfind("```") == -1:
+                codeblock_start = len(current_block) - 1
+            while len(current_block) > 1996:  # leave space for closing brackets
+                current_block = current_block[:codeblock_start].rsplit(
+                    "\n", 1)[0]  # split on last new line
+            # add closing code brackets
+            current_block = current_block + "```"
+            # add opening brackets to remaining content
+            remaining_content = "```" + \
+                remaining_content[len(current_block) - 3:]
+        # cut neatly on last period
+        else:
+            last_line = current_block.rindex("\n")
+            last_period = current_block.rindex(".") + 1  # include period
+            # check what comes first - new line or period
+            current_block = current_block[:max(last_line, last_period)]
+            remaining_content = remaining_content[len(current_block):]
+        await channel.send(current_block)
+    await channel.send(remaining_content)
 
 
 async def generate_messagehistory(channel: discord.TextChannel):
@@ -84,6 +115,9 @@ def ignoreMessage(message: discord.Message) -> bool:
         return True
     if message.content.startswith('{') and message.content.endswith("}"):
         print("System message")
+        return True
+    if len(message.content) < 2:
+        print("Empty message")
         return True
     return False
 
