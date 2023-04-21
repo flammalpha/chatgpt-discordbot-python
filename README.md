@@ -11,6 +11,18 @@
   - Language-Code will be transferred if available
   - Normal messages will be split on last period or linebreak
 
+## How-To
+
+Create a .env file with following content:
+
+```plain
+openai_token=xxx
+elevenlabs_token=xxx
+discord_token=xxx
+guild_id=xxx
+category_id=xxx
+```
+
 ## Ressources
 
 - [ChatGPT](chat.openai.com)
