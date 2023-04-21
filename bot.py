@@ -28,7 +28,7 @@ async def on_ready():
 
 @client.event
 async def on_message(message: discord.Message):
-    if ignoreMessage(message):
+    if ignore_message(message):
         print("Not my business")
         return
 
@@ -113,7 +113,7 @@ async def generate_messagehistory(channel: discord.TextChannel):
     return messages
 
 
-def ignoreMessage(message: discord.Message) -> bool:
+def ignore_message(message: discord.Message) -> bool:
     '''Checks for bot account,
     chat inside certain guild with category,
     aswell as system prompt'''
@@ -123,7 +123,7 @@ def ignoreMessage(message: discord.Message) -> bool:
     if message.author.bot or message.author.id == client.user.id:
         print("Bot detected")
         return True
-    if message.guild.id != guild_id:
+    if message.guild is None or message.guild.id != guild_id:
         print(f"Wrong guild {message.guild.id} but expected {guild_id}")
         return True
     if message.channel.category is None or message.channel.category.id != category_id:
