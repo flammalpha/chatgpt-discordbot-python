@@ -19,8 +19,8 @@ Create a .env file with following content:
 openai_token=xxx
 elevenlabs_token=xxx
 discord_token=xxx
-guild_id=xxx
-category_id=xxx
+guild_id=optional
+category_id=optional
 ```
 
 ## Ressources

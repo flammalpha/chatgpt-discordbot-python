@@ -10,8 +10,8 @@ load_dotenv()
 discord_token = os.getenv("discord_token")
 openai_token = os.getenv("openai_token")
 elevenlabs_token = os.getenv("elevenlabs_token")
-guild_id = int(os.getenv("guild_id"))
-category_id = int(os.getenv("category_id"))
+guild_id = os.getenv("guild_id")
+category_id = os.getenv("category_id")
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -52,7 +52,7 @@ async def on_message(message: discord.Message):
             error_embed = discord.Embed(
                 title="Error", description=f"```{str(e)}```", color=discord.Color.red())
             await message.channel.send(embed=error_embed)
-    if response is not None:
+    if 'response' in locals():
         await send_message_blocks(message.channel, response)
 
 
@@ -123,10 +123,12 @@ def ignore_message(message: discord.Message) -> bool:
     if message.author.bot or message.author.id == client.user.id:
         print("Bot detected")
         return True
-    if message.guild is None or message.guild.id != guild_id:
+    if message.guild is None or \
+        guild_id is not None and message.guild.id != int(guild_id):
         print(f"Wrong or no guild")
         return True
-    if message.channel.category is None or message.channel.category.id != category_id:
+    if message.channel.category is None or \
+        category_id is not None and message.channel.category.id != int(category_id):
         print("Not in Category")
         return True
     if message.content.startswith('{') and message.content.endswith("}"):
