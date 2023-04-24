@@ -80,7 +80,7 @@ async def send_message_blocks(channel: discord.TextChannel, content: str):
         # cut neatly on last period
         else:
             last_line = current_block.rindex("\n")
-            last_period = current_block.rindex(".") + 1  # include period
+            last_period = current_block.rindex(". ") + 1  # include period
             # check what comes first - new line or period
             current_block = current_block[:max(last_line, last_period)]
             remaining_content = remaining_content[len(current_block):]
