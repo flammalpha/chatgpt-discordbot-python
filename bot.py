@@ -1,4 +1,5 @@
 import os
+import re
 from dotenv import load_dotenv
 import discord
 
@@ -59,22 +60,18 @@ async def on_message(message: discord.Message):
 async def send_message_blocks(channel: discord.TextChannel, content: str):
     remaining_content = content
     while len(remaining_content) > 2000:
-        current_block = remaining_content[:1999]
-        # check for codeblock then cut neatly on a line inside block
+        current_block = remaining_content[:2000]
+        # check for codeblock then cut neatly on a line inside block while leaving space for closing brackets
+        while len(current_block) > 1997 and current_block.count("```") % 2 > 0:
+            current_block = current_block.rsplit(
+                "\n", 1)[0]  # split on last new line
         if current_block.count("```") % 2 > 0:
-            codeblock_start = current_block.rfind(
-                "```")  # last opened codeblock
-            # check if not first / opening bracket
-            if current_block[:codeblock_start].rfind("```") == -1:
-                codeblock_start = len(current_block) - 1
-            while len(current_block) > 1996:  # leave space for closing brackets
-                current_block = current_block[:codeblock_start].rsplit(
-                    "\n", 1)[0]  # split on last new line
-
             # gather language code if possible
+            language_code = ""
             opening_bracket_index = current_block.rfind("```") + 3
-            language_code = current_block[opening_bracket_index:].split("\n")[
-                0].split(" ")[0]
+            if opening_bracket_index > -1:
+                language_code = current_block[opening_bracket_index:].split("\n")[
+                    0].split(" ")[0]
             # add closing code brackets
             current_block = current_block + "```"
             # add opening brackets to remaining content
@@ -124,11 +121,11 @@ def ignore_message(message: discord.Message) -> bool:
         print("Bot detected")
         return True
     if message.guild is None or \
-        guild_id is not None and message.guild.id != int(guild_id):
+            guild_id is not None and message.guild.id != int(guild_id):
         print(f"Wrong or no guild")
         return True
     if message.channel.category is None or \
-        category_id is not None and message.channel.category.id != int(category_id):
+            category_id is not None and message.channel.category.id != int(category_id):
         print("Not in Category")
         return True
     if message.content.startswith('{') and message.content.endswith("}"):
