@@ -10,6 +10,7 @@
   - Code-Blocks will be split on linebreaks cleanly
   - Language-Code will be transferred if available
   - Normal messages will be split on last period or linebreak
+- Delete all messages inbetween and including messges reacted with `:X:` (`\u274c`)
 
 ## How-To
 
@@ -21,6 +22,7 @@ elevenlabs_token=xxx
 discord_token=xxx
 guild_id=optional
 category_id=optional
+admin_user_id=optional
 ```
 
 ## Ressources

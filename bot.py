@@ -1,5 +1,6 @@
 import os
 import re
+from typing import Set
 from dotenv import load_dotenv
 import discord
 
@@ -13,6 +14,7 @@ openai_token = os.getenv("openai_token")
 elevenlabs_token = os.getenv("elevenlabs_token")
 guild_id = os.getenv("guild_id")
 category_id = os.getenv("category_id")
+admin_user_id = os.getenv("admin_user_id")
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -55,6 +57,42 @@ async def on_message(message: discord.Message):
             await message.channel.send(embed=error_embed)
     if 'response' in locals():
         await send_message_blocks(message.channel, response)
+
+
+@client.event
+async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
+    cross_reaction = "\u274c"
+    if (payload.emoji.name == cross_reaction) and \
+            (admin_user_id is None or payload.user_id == int(admin_user_id)):
+        deletion_messages_list: Set[discord.Message] = set()
+
+        guild_channel = client.get_guild(
+            payload.guild_id).get_channel(payload.channel_id)
+        admin_user = None
+        if admin_user_id is not None:
+            admin_user = client.get_guild(
+                payload.guild_id).get_member(int(admin_user_id))
+        # reacted_message = await guild_channel.fetch_message(payload.message_id)
+        # Get message history to check for multiple reactions
+        async for message in guild_channel.history(limit=None, oldest_first=True):
+            for reaction in message.reactions:
+                if reaction.emoji == cross_reaction and \
+                        (admin_user is None or admin_user in await reaction.users()):
+                    deletion_messages_list.add(message)
+        # if two reactions with :X: exist -> delete all messages inbetween
+        if len(deletion_messages_list) % 2 == 0:
+            deleting = False
+            async for message in guild_channel.history(limit=None, oldest_first=True):
+                for reaction in message.reactions:
+                    if reaction.emoji == cross_reaction and \
+                            (admin_user is None or admin_user in await reaction.users()):
+                        deleting = not deleting
+                if deleting:
+                    deletion_messages_list.add(message)
+            await guild_channel.delete_messages(deletion_messages_list)
+            print(f"Deleted {len(deletion_messages_list)} messages!")
+    else:
+        print("Reaction added")
 
 
 async def send_message_blocks(channel: discord.TextChannel, content: str):
