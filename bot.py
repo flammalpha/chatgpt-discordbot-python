@@ -90,24 +90,37 @@ async def send_message_blocks(channel: discord.TextChannel, content: str):
 
 async def generate_messagehistory(channel: discord.TextChannel):
     print("Reading message history")
-    messages = []
+    message_history = []
+    previous_author = 0
     async for message in channel.history(limit=None, oldest_first=True):
         # ignore messages starting with !!
         if message.content.startswith("!!"):
             continue
-        # check user or bot
-        if message.author.id == client.user.id:
-            messages.append(
-                {"role": "assistant", "content": message.content})
-        else:
-            # check system message
-            if message.content.startswith('{') and message.content.endswith("}"):
-                messages.append(
-                    {"role": "system", "content": message.content[1:-1]})
+        # combine adjacent messages from same author
+        if len(message_history) > 0 and \
+                previous_author == message.author.id:
+            if message.content.startswith("```") and \
+                    str(message_history[-1]["content"]).endswith("```"):
+                message_history[-1]["content"] = message_history[-1]["content"][:-3] + \
+                    "\n" + message.content.split("\n", 1)[1]
             else:
-                messages.append(
-                    {"role": "user", "content": message.content})
-    return messages
+                message_history[-1]["content"] += "\n" + message.content
+        # add new entry for different author
+        else:
+            # check user or bot
+            if message.author.id == client.user.id:
+                message_history.append(
+                    {"role": "assistant", "content": message.content})
+            else:
+                # check system message
+                if message.content.startswith('{') and message.content.endswith("}"):
+                    message_history.append(
+                        {"role": "system", "content": message.content[1:-1]})
+                else:
+                    message_history.append(
+                        {"role": "user", "content": message.content})
+        previous_author = message.author.id
+    return message_history
 
 
 def ignore_message(message: discord.Message) -> bool:
