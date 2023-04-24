@@ -93,8 +93,8 @@ async def generate_messagehistory(channel: discord.TextChannel):
     message_history = []
     previous_author = 0
     async for message in channel.history(limit=None, oldest_first=True):
-        # ignore messages starting with !!
-        if message.content.startswith("!!"):
+        # ignore messages starting with !! or too short
+        if message.content.startswith("!!") or len(message.content) < 2:
             continue
         # combine adjacent messages from same author
         if len(message_history) > 0 and \
