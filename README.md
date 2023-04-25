@@ -27,6 +27,6 @@ admin_user_id=optional
 
 ## Ressources
 
-- [ChatGPT](chat.openai.com)
+- [ChatGPT](https://chat.openai.com)
 - [ChatGPT API](https://platform.openai.com/docs/api-reference)
 - [Discord.py](https://discordpy.readthedocs.io/en/stable/)
