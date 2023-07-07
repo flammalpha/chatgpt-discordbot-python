@@ -15,12 +15,16 @@ elevenlabs_token = os.getenv("elevenlabs_token")
 guild_id = os.getenv("guild_id")
 category_id = os.getenv("category_id")
 admin_user_id = os.getenv("admin_user_id")
+model_version = os.getenv("model_version")
+
+if model_version is None or model_version is "":
+    model_version = "gpt-4"
 
 intents = discord.Intents.default()
 intents.message_content = True
 
 client = discord.Client(intents=intents)
-chatgpt = Chat(openai_token)
+chatgpt = Chat(openai_token, model_version)
 elevenlabs = Voice(elevenlabs_token)
 
 
@@ -62,6 +66,7 @@ async def on_message(message: discord.Message):
 @client.event
 async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     cross_reaction = "\u274c"
+    exclamation_reaction = "\u203c"
     if (payload.emoji.name == cross_reaction) and \
             (admin_user_id is None or payload.user_id == int(admin_user_id)):
         deletion_messages_list: Set[discord.Message] = set()
@@ -91,6 +96,9 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
                     deletion_messages_list.add(message)
             await guild_channel.delete_messages(deletion_messages_list)
             print(f"Deleted {len(deletion_messages_list)} messages!")
+    elif (payload.emoji.name == exclamation_reaction) and \
+            (admin_user_id is None or payload.user_id == int(admin_user_id)):
+        pass
     else:
         print("Reaction added")
 

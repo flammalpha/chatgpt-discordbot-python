@@ -3,15 +3,16 @@ import tiktoken
 
 
 class Chat:
-    def __init__(self, token: str) -> None:
+    def __init__(self, token: str, model_version: str) -> None:
         openai.api_key = token
+        self.model_version = model_version
 
     def get_response(self, message_history: dict) -> str:
         '''Fetches response from ChatGPT-3.5-Turbo with entire message history'''
 
         print("Fetching response from ChatGPT")
         completion = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo", messages=message_history)
+            model=self.model_version, messages=message_history)
 
         response = completion.choices[0].message.content
 
@@ -24,7 +25,7 @@ class Chat:
 
         print("Fetching response from ChatGPT")
         completion = await openai.ChatCompletion.acreate(
-            model="gpt-3.5-turbo", messages=message_history)
+            model=self.model_version, messages=message_history)
 
         response = completion.choices[0].message.content
 
@@ -34,7 +35,7 @@ class Chat:
 
     def calculate_tokens(self, messages: dict) -> int:
         '''Calculates an estimate of the tokens used by message history'''
-        counter = tiktoken.encoding_for_model("gpt-3.5-turbo")
+        counter = tiktoken.encoding_for_model(self.model_version)
         raise "Not implemented yet"
         for entry in messages:
             counter.count_tokens(entry.content)
