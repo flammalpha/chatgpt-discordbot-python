@@ -17,7 +17,7 @@ category_id = os.getenv("category_id")
 admin_user_id = os.getenv("admin_user_id")
 model_version = os.getenv("model_version")
 
-if model_version is None or model_version is "":
+if model_version is None or model_version == "":
     model_version = "gpt-4"
 
 intents = discord.Intents.default()
