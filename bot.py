@@ -19,6 +19,7 @@ model_version = os.getenv("model_version")
 
 if model_version is None or model_version == "":
     model_version = "gpt-4"
+print(f"Now using {model_version}")
 
 intents = discord.Intents.default()
 intents.message_content = True
