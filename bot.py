@@ -54,7 +54,7 @@ async def on_message(message: discord.Message):
                 else:
                     message_history = await generate_messagehistory(
                         message.channel)
-                    
+
                 # add system message if available
                 if "system_message" in channel_config:
                     message_history.append(
@@ -171,8 +171,10 @@ async def get_channel_config(channel: discord.TextChannel):
             if description_json["model_version"] in ["davinci", "gpt-3.5-turbo", "gpt-4"]:
                 channel_config["model_version"] = description_json["model_version"]
             else:
-                raise Exception(
-                    f"Invalid model version: {description_json['model_version']}")
+                error_embed = discord.Embed(
+                    title="Error", description=f"Invalid model version: {description_json['model_version']}.\n" +
+                    "Allowed values: davinci, gpt-3.5-turbo, gpt-4", color=discord.Color.red())
+                await channel.send(embed=error_embed)
             print(f"Using model version: {channel_config['model_version']}")
 
         # check for message history length
@@ -183,8 +185,10 @@ async def get_channel_config(channel: discord.TextChannel):
             elif description_json["history_length"] in range(1, 100):
                 channel_config["history_length"] = description_json["history_length"]
             else:
-                raise Exception(
-                    f"Invalid history length: {description_json['history_length']}")
+                error_embed = discord.Embed(
+                    title="Error", description=f"Invalid history length: {description_json['history_length']}.\n" +
+                          "Allowed values: 1-99, 0 for unlimited", color=discord.Color.red())
+                await channel.send(embed=error_embed)
             print(f"Using history length: {channel_config['history_length']}")
 
         # check for system message
@@ -193,6 +197,9 @@ async def get_channel_config(channel: discord.TextChannel):
 
         return channel_config
     except Exception as e:
+        error_embed = discord.Embed(
+            title="Error", description=f"```{str(e)}```", color=discord.Color.red())
+        await channel.send(embed=error_embed)
         print(f"Error reading description: {e}")
     return None
 
