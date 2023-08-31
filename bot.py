@@ -47,12 +47,20 @@ async def on_message(message: discord.Message):
             # generate ChatGPT prompt
             channel_config = await get_channel_config(message.channel)
             if channel_config is not None:
+                # generate history
                 if "history_length" in channel_config:
                     message_history = await generate_messagehistory(
                         message.channel, channel_config["history_length"])
                 else:
                     message_history = await generate_messagehistory(
                         message.channel)
+                    
+                # add system message if available
+                if "system_message" in channel_config:
+                    message_history.append(
+                        {"role": "system", "content": channel_config["system_message"]})
+
+                # generate response
                 if "model_version" in channel_config:
                     response = await chatgpt.get_response_async(
                         message_history, channel_config["model_version"])
@@ -178,6 +186,10 @@ async def get_channel_config(channel: discord.TextChannel):
                 raise Exception(
                     f"Invalid history length: {description_json['history_length']}")
             print(f"Using history length: {channel_config['history_length']}")
+
+        # check for system message
+        if "system_message" in description_json:
+            channel_config["system_message"] = description_json["system_message"]
 
         return channel_config
     except Exception as e:
