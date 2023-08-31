@@ -1,5 +1,6 @@
 import os
 import re
+import json
 from typing import Set
 from dotenv import load_dotenv
 import discord
@@ -44,8 +45,21 @@ async def on_message(message: discord.Message):
     async with message.channel.typing():
         try:
             # generate ChatGPT prompt
-            message_history = await generate_messagehistory(message.channel)
-            response = await chatgpt.get_response_async(message_history)
+            channel_config = await get_channel_config(message.channel)
+            if channel_config is not None:
+                if "history_length" in channel_config:
+                    message_history = await generate_messagehistory(
+                        message.channel, channel_config["history_length"])
+                else:
+                    message_history = await generate_messagehistory(
+                        message.channel)
+                if "model_version" in channel_config:
+                    response = await chatgpt.get_response_async(
+                        message_history, channel_config["model_version"])
+                else:
+                    response = await chatgpt.get_response_async(message_history)
+            # message_history = await generate_messagehistory(message.channel)
+            # response = await chatgpt.get_response_async(message_history)
 
             # check if user is in voice -> generate TTS if funds available
             if message.author.voice and message.author.voice.channel:
@@ -133,6 +147,42 @@ async def send_message_blocks(channel: discord.TextChannel, content: str):
             remaining_content = remaining_content[len(current_block):]
         await channel.send(current_block)
     await channel.send(remaining_content)
+
+
+async def get_channel_config(channel: discord.TextChannel):
+    print("Reading channel config from description")
+    description = channel.topic
+    try:
+        # jsonify description
+        description_json = json.loads(description)
+
+        channel_config = {}
+        # check for model version
+        if "model_version" in description_json:
+            # check if model version is valid
+            if description_json["model_version"] in ["davinci", "gpt-3.5-turbo", "gpt-4"]:
+                channel_config["model_version"] = description_json["model_version"]
+            else:
+                raise Exception(
+                    f"Invalid model version: {description_json['model_version']}")
+            print(f"Using model version: {channel_config['model_version']}")
+
+        # check for message history length
+        if "history_length" in description_json:
+            # check if history length is valid
+            if description_json["history_length"] == 0:
+                channel_config["history_length"] = None
+            elif description_json["history_length"] in range(1, 100):
+                channel_config["history_length"] = description_json["history_length"]
+            else:
+                raise Exception(
+                    f"Invalid history length: {description_json['history_length']}")
+            print(f"Using history length: {channel_config['history_length']}")
+
+        return channel_config
+    except Exception as e:
+        print(f"Error reading description: {e}")
+    return None
 
 
 async def generate_messagehistory(channel: discord.TextChannel, history_length: int = None):
