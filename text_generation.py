@@ -7,12 +7,13 @@ class Chat:
         openai.api_key = token
         self.model_version = model_version
 
-    def get_response(self, message_history: dict) -> str:
+    def get_response(self, message_history: dict, model_version: str = None) -> str:
         '''Fetches response from ChatGPT-3.5-Turbo with entire message history'''
+        fetch_model_version = model_version if model_version is not None else self.model_version
 
         print("Fetching response from ChatGPT")
         completion = openai.ChatCompletion.create(
-            model=self.model_version, messages=message_history)
+            model=fetch_model_version, messages=message_history)
 
         response = completion.choices[0].message.content
 
@@ -20,12 +21,13 @@ class Chat:
         print(f"({len(response)})")
         return response
 
-    async def get_response_async(self, message_history: dict) -> str:
+    async def get_response_async(self, message_history: dict, model_version: str = None) -> str:
         '''Fetches response from ChatGPT-3.5-Turbo with entire message history'''
+        fetch_model_version = model_version if model_version is not None else self.model_version
 
         print("Fetching response from ChatGPT")
         completion = await openai.ChatCompletion.acreate(
-            model=self.model_version, messages=message_history)
+            model=fetch_model_version, messages=message_history)
 
         response = completion.choices[0].message.content
 
