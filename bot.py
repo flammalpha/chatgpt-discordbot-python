@@ -135,23 +135,26 @@ async def send_message_blocks(channel: discord.TextChannel, content: str):
     await channel.send(remaining_content)
 
 
-async def generate_messagehistory(channel: discord.TextChannel):
+async def generate_messagehistory(channel: discord.TextChannel, history_length: int = None):
     print("Reading message history")
     message_history = []
     previous_author = 0
-    async for message in channel.history(limit=None, oldest_first=True):
+    async for message in channel.history(limit=history_length):
         # ignore messages starting with !! or too short
         if message.content.startswith("!!") or len(message.content) < 2:
             continue
         # combine adjacent messages from same author
         if len(message_history) > 0 and \
                 previous_author == message.author.id:
-            if message.content.startswith("```") and \
-                    str(message_history[-1]["content"]).endswith("```"):
-                message_history[-1]["content"] = message_history[-1]["content"][:-3] + \
-                    "\n" + message.content.split("\n", 1)[1]
+            # check for codeblock
+            if str(message_history[-1]["content"]).startswith("```") and \
+                    message.content.endswith("```"):
+                message_history[-1]["content"] = message.content[:-3] + \
+                    "\n" + str(message_history[-1]
+                               ["content"]).split("\n", 1)[1]
             else:
-                message_history[-1]["content"] += "\n" + message.content
+                message_history[-1]["content"] += message.content + \
+                    "\n" + message_history[-1]["content"]
         # add new entry for different author
         else:
             # check user or bot
@@ -167,6 +170,9 @@ async def generate_messagehistory(channel: discord.TextChannel):
                     message_history.append(
                         {"role": "user", "content": message.content})
         previous_author = message.author.id
+
+    # reverse message history
+    message_history.reverse()
     return message_history
 
 
