@@ -8,7 +8,7 @@ class Chat:
         self.model_version = model_version
 
     def get_response(self, message_history: dict, model_version: str = None) -> str:
-        '''Fetches response from ChatGPT-3.5-Turbo with entire message history'''
+        '''Fetches response from ChatGPT with entire message history'''
         fetch_model_version = model_version if model_version is not None else self.model_version
 
         print("Fetching response from ChatGPT")
@@ -17,12 +17,12 @@ class Chat:
 
         response = completion.choices[0].message.content
 
-        print(response)
-        print(f"({len(response)})")
+        # print(response)
+        print(f"Response with {len(response)} characters")
         return response
 
     async def get_response_async(self, message_history: dict, model_version: str = None) -> str:
-        '''Fetches response from ChatGPT-3.5-Turbo with entire message history'''
+        '''Fetches response from ChatGPT with entire message history'''
         fetch_model_version = model_version if model_version is not None else self.model_version
 
         print("Fetching response from ChatGPT")
@@ -31,8 +31,8 @@ class Chat:
 
         response = completion.choices[0].message.content
 
-        print(response)
-        print(f"({len(response)})")
+        # print(response)
+        print(f"Response with {len(response)} characters")
         return response
 
     def calculate_tokens(self, messages: dict) -> int:
