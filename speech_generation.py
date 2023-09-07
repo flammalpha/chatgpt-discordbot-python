@@ -22,22 +22,22 @@ class Voice:
         else:
             print("You do not have enough characters left this month for this voice.")
             print(f"(Needed: {len(prompt)} / Remaining: {remaining})")
-        raise "Unable to generate voice"
+        raise Exception("Unable to generate voice")
 
     def get_voice_bytes_history(self, prompt: str) -> bytes:
         for historyItem in self.__eleven_labs_user.get_history_items():
             if historyItem.text == prompt:
                 audio_bytes = historyItem.get_audio_bytes()
                 return audio_bytes
-        raise "Voice file not found"
+        raise Exception("Voice file not found")
 
     def remove_history(self, prompt: str) -> None:
         for historyItem in self.__eleven_labs_user.get_history_items():
             if historyItem.text == prompt:
                 historyItem.delete()
                 print("Successfully deleted voice")
-                break
-        raise "Could not find voice"
+                return
+        raise Exception("Could not find voice")
 
     def get_character_remaining(self) -> int:
         limit = self.__eleven_labs_user.get_character_limit()

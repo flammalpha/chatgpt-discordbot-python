@@ -1,3 +1,4 @@
+from io import BytesIO
 import os
 import re
 import json
@@ -66,21 +67,34 @@ async def on_message(message: discord.Message):
                         message_history, channel_config["model_version"])
                 else:
                     response = await chatgpt.get_response_async(message_history)
-            # message_history = await generate_messagehistory(message.channel)
-            # response = await chatgpt.get_response_async(message_history)
+            else:
+                message_history = await generate_messagehistory(message.channel)
+                response = await chatgpt.get_response_async(message_history)
 
             # check if user is in voice -> generate TTS if funds available
             if message.author.voice and message.author.voice.channel:
-                # message.author.voice.channel.connect()
-                if elevenlabs.get_character_remaining() > response:
-                    # generate voice
-                    pass
-                else:
-                    # say not enough funds
-                    pass
+                voice_client = await message.author.voice.channel.connect()
+                try:
+                    if elevenlabs.get_character_remaining() > len(response):
+                        text_bytes = elevenlabs.get_voice_bytes(response)
+                        text_bytes_io = BytesIO(text_bytes)
+                        voice_client.play(discord.FFmpegPCMAudio(
+                            text_bytes_io, pipe=True))
+                        elevenlabs.remove_history(response)
+                    else:
+                        # say not enough funds
+                        voice_client.play(discord.FFmpegPCMAudio(
+                            "not_enough_tokens.mp3", pipe=True))
+                    while voice_client.is_playing():
+                        pass
+                except Exception as e:
+                    error_embed = discord.Embed(
+                        title="Error playing voice", description=f"```{str(e)}```", color=discord.Color.red())
+                    await message.channel.send(embed=error_embed)
+                await voice_client.disconnect()
         except Exception as e:
             error_embed = discord.Embed(
-                title="Error", description=f"```{str(e)}```", color=discord.Color.red())
+                title="Error on_message", description=f"```{str(e)}```", color=discord.Color.red())
             await message.channel.send(embed=error_embed)
     if 'response' in locals():
         await send_message_blocks(message.channel, response)
@@ -173,7 +187,7 @@ async def get_channel_config(channel: discord.TextChannel):
                 channel_config["model_version"] = description_json["model_version"]
             else:
                 error_embed = discord.Embed(
-                    title="Error", description=f"Invalid model version: {description_json['model_version']}.\n" +
+                    title="Error channel_config model_version", description=f"Invalid model version: {description_json['model_version']}.\n" +
                     "Allowed values: davinci, gpt-3.5-turbo, gpt-4", color=discord.Color.red())
                 await channel.send(embed=error_embed)
             print(f"Using model version: {channel_config['model_version']}")
@@ -187,7 +201,7 @@ async def get_channel_config(channel: discord.TextChannel):
                 channel_config["history_length"] = description_json["history_length"]
             else:
                 error_embed = discord.Embed(
-                    title="Error", description=f"Invalid history length: {description_json['history_length']}.\n" +
+                    title="Error channel_config history_length", description=f"Invalid history length: {description_json['history_length']}.\n" +
                           "Allowed values: 1-99, 0 for unlimited", color=discord.Color.red())
                 await channel.send(embed=error_embed)
             print(f"Using history length: {channel_config['history_length']}")
@@ -199,7 +213,7 @@ async def get_channel_config(channel: discord.TextChannel):
         return channel_config
     except Exception as e:
         error_embed = discord.Embed(
-            title="Error", description=f"```{str(e)}```", color=discord.Color.red())
+            title="Error channel_config", description=f"```{str(e)}```", color=discord.Color.red())
         await channel.send(embed=error_embed)
         print(f"Error reading description: {e}")
     return None
