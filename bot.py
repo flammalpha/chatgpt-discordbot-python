@@ -5,6 +5,7 @@ import json
 from typing import Set
 from dotenv import load_dotenv
 import discord
+from static_ffmpeg import run
 
 from text_generation import Chat
 from speech_generation import Voice
@@ -78,8 +79,9 @@ async def on_message(message: discord.Message):
                     if elevenlabs.get_character_remaining() > len(response):
                         text_bytes = elevenlabs.get_voice_bytes(response)
                         text_bytes_io = BytesIO(text_bytes)
+                        ffmpeg, ffprobe = run.get_or_fetch_platform_executables_else_raise()
                         voice_client.play(discord.FFmpegPCMAudio(
-                            text_bytes_io, pipe=True))
+                            text_bytes_io, executable=ffmpeg, pipe=True))
                         elevenlabs.remove_history(response)
                     else:
                         # say not enough funds
