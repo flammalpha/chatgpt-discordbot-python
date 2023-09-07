@@ -159,10 +159,11 @@ async def send_message_blocks(channel: discord.TextChannel, content: str):
 
 async def get_channel_config(channel: discord.TextChannel):
     print("Reading channel config from description")
-    description = channel.topic
+    if channel.topic is None:
+        return None
     try:
         # jsonify description
-        description_json = json.loads(description)
+        description_json = json.loads(channel.topic)
 
         channel_config = {}
         # check for model version
