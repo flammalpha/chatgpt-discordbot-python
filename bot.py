@@ -59,8 +59,12 @@ async def on_message(message: discord.Message):
 
                 # add system message if available
                 if "system_message" in channel_config:
-                    message_history.append(
-                        {"role": "system", "content": channel_config["system_message"]})
+                    if "sys_msg_order" in channel_config and channel_config["sys_msg_order"] == "first":
+                        message_history.insert(
+                            0, {"role": "system", "content": channel_config["system_message"]})
+                    else:
+                        message_history.append(
+                            {"role": "system", "content": channel_config["system_message"]})
 
                 # generate response
                 if "model_version" in channel_config:
@@ -211,6 +215,10 @@ async def get_channel_config(channel: discord.TextChannel):
         # check for system message
         if "system_message" in description_json:
             channel_config["system_message"] = description_json["system_message"]
+
+        # check for system message order
+        if "sys_msg_order" in description_json:
+            channel_config["sys_msg_order"] = description_json["sys_msg_order"]
 
         return channel_config
     except Exception as e:
