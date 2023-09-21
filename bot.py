@@ -179,7 +179,7 @@ async def get_channel_config(channel: discord.TextChannel):
         return None
     try:
         # jsonify description
-        description_json = json.loads(channel.topic)
+        description_json = json.loads(channel.topic, strict=False)
 
         channel_config = {}
         # check for model version
