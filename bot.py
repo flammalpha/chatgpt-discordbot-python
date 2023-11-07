@@ -20,7 +20,8 @@ category_id = os.getenv("category_id")
 admin_user_id = os.getenv("admin_user_id")
 model_version = os.getenv("model_version")
 
-if model_version is None or model_version == "":
+model_list: [str] = ["davinci", "gpt-3.5-turbo-16k", "gpt-3.5-turbo", "gpt-3.5-turbo-1106", "gpt-4", "gpt-4-32k", "gpt-4-1106-preview"]
+if model_version is None or model_version == "" or model_version not in model_list:
     model_version = "gpt-4"
 print(f"Now using {model_version}")
 
@@ -189,12 +190,12 @@ async def get_channel_config(channel: discord.TextChannel):
         # check for model version
         if "model_version" in description_json:
             # check if model version is valid
-            if description_json["model_version"] in ["davinci", "gpt-3.5-turbo", "gpt-4"]:
+            if description_json["model_version"] in model_list:
                 channel_config["model_version"] = description_json["model_version"]
             else:
                 error_embed = discord.Embed(
                     title="Error channel_config model_version", description=f"Invalid model version: {description_json['model_version']}.\n" +
-                    "Allowed values: davinci, gpt-3.5-turbo, gpt-4", color=discord.Color.red())
+                    f"Allowed values: {", ".join(model_list)}", color=discord.Color.red())
                 await channel.send(embed=error_embed)
             print(f"Using model version: {channel_config['model_version']}")
 
