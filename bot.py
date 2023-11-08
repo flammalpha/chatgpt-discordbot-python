@@ -193,9 +193,10 @@ async def get_channel_config(channel: discord.TextChannel):
             if description_json["model_version"] in model_list:
                 channel_config["model_version"] = description_json["model_version"]
             else:
+                model_list_str = ", ".join(model_list)
                 error_embed = discord.Embed(
                     title="Error channel_config model_version", description=f"Invalid model version: {description_json['model_version']}.\n" +
-                    f"Allowed values: {", ".join(model_list)}", color=discord.Color.red())
+                    f"Allowed values: {model_list_str}", color=discord.Color.red())
                 await channel.send(embed=error_embed)
             print(f"Using model version: {channel_config['model_version']}")
 
