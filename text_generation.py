@@ -1,10 +1,10 @@
-import openai
+from openai import AsyncOpenAI, OpenAI
 import tiktoken
 
 
 class Chat:
     def __init__(self, token: str, model_version: str) -> None:
-        openai.api_key = token
+        self.api_key = token
         self.model_version = model_version
 
     def get_response(self, message_history: dict, model_version: str = None) -> str:
@@ -12,7 +12,7 @@ class Chat:
         fetch_model_version = model_version if model_version is not None else self.model_version
 
         print("Fetching response from ChatGPT")
-        completion = openai.ChatCompletion.create(
+        completion = OpenAI(api_key=self.api_key).chat.completions.create(
             model=fetch_model_version, messages=message_history)
 
         response = completion.choices[0].message.content
@@ -26,7 +26,7 @@ class Chat:
         fetch_model_version = model_version if model_version is not None else self.model_version
 
         print("Fetching response from ChatGPT")
-        completion = await openai.ChatCompletion.acreate(
+        completion = await AsyncOpenAI(api_key=self.api_key).chat.completions.create(
             model=fetch_model_version, messages=message_history)
 
         response = completion.choices[0].message.content

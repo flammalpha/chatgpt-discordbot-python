@@ -1,6 +1,6 @@
 from io import BytesIO
 import os
-import re
+import asyncio
 import json
 from typing import Set
 from dotenv import load_dotenv
@@ -87,6 +87,8 @@ async def on_message(message: discord.Message):
                         ffmpeg, ffprobe = run.get_or_fetch_platform_executables_else_raise()
                         voice_client.play(discord.FFmpegPCMAudio(
                             text_bytes_io, executable=ffmpeg, pipe=True))
+                        while voice_client.is_playing():
+                            await asyncio.sleep(1)
                         elevenlabs.remove_history(response)
                     else:
                         # say not enough funds

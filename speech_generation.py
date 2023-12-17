@@ -1,13 +1,10 @@
-from elevenlabslib import ElevenLabsUser
-
+from elevenlabs import generate, set_api_key
+from elevenlabs.api import History, User
 
 class Voice:
-    name = "Bella"
-
-    def __init__(self, token) -> None:
-        self.__eleven_labs_user = ElevenLabsUser(token)
-        self.__eleven_labs_voice = self.__eleven_labs_user.get_voices_by_name(self.name)[
-            0]
+    def __init__(self, token: str, name: str = "Glinda") -> None:
+        set_api_key(token)
+        self.__voice_name = name
 
     def get_voice_bytes(self, prompt: str) -> bytes:
         remaining = self.get_character_remaining()
@@ -15,7 +12,7 @@ class Voice:
             print("Fetching audio from ElevenLabs")
             print(
                 f"Using {len(prompt)} characters out of {remaining} remaining.")
-            audio_bytes = self.__eleven_labs_voice.generate_audio_bytes(prompt)
+            audio_bytes = generate(prompt, voice=self.__voice_name)
             print(
                 f"Remaining characters: {self.get_character_remaining()}")
             return audio_bytes
@@ -25,14 +22,14 @@ class Voice:
         raise Exception("Unable to generate voice")
 
     def get_voice_bytes_history(self, prompt: str) -> bytes:
-        for historyItem in self.__eleven_labs_user.get_history_items():
+        for historyItem in History.from_api().items:
             if historyItem.text == prompt:
-                audio_bytes = historyItem.get_audio_bytes()
+                audio_bytes = historyItem.audio
                 return audio_bytes
         raise Exception("Voice file not found")
 
     def remove_history(self, prompt: str) -> None:
-        for historyItem in self.__eleven_labs_user.get_history_items():
+        for historyItem in History.from_api().items:
             if historyItem.text == prompt:
                 historyItem.delete()
                 print("Successfully deleted voice")
@@ -40,7 +37,9 @@ class Voice:
         raise Exception("Could not find voice")
 
     def get_character_remaining(self) -> int:
-        limit = self.__eleven_labs_user.get_character_limit()
-        current = self.__eleven_labs_user.get_current_character_count()
-        print(f"Used up {current} out of {limit} characters.")
+        user = User.from_api()
+        limit = user.subscription.character_limit
+        current = user.subscription.character_count
+        percentage = current / limit * 100
+        print(f"Used up {current} out of {limit} characters ({percentage}%).")
         return limit - current
