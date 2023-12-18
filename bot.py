@@ -1,10 +1,16 @@
 from io import BytesIO
 import os
+import re
 import asyncio
 import json
 from typing import Set
 from dotenv import load_dotenv
 import discord
+
+# testing
+# import importlib
+# import test_message
+
 from static_ffmpeg import run
 
 from text_generation import Chat
@@ -20,7 +26,8 @@ category_id = os.getenv("category_id")
 admin_user_id = os.getenv("admin_user_id")
 model_version = os.getenv("model_version")
 
-model_list: [str] = ["davinci", "gpt-3.5-turbo-16k", "gpt-3.5-turbo", "gpt-3.5-turbo-1106", "gpt-4", "gpt-4-32k", "gpt-4-1106-preview"]
+model_list: [str] = ["davinci", "gpt-3.5-turbo-16k", "gpt-3.5-turbo",
+                     "gpt-3.5-turbo-1106", "gpt-4", "gpt-4-32k", "gpt-4-1106-preview", "gpt-4-vision-preview"]
 if model_version is None or model_version == "" or model_version not in model_list:
     model_version = "gpt-4"
 print(f"Now using {model_version}")
@@ -40,6 +47,14 @@ async def on_ready():
 
 @client.event
 async def on_message(message: discord.Message):
+    # if message.guild is None and message.author.id != client.user.id:
+    #     if message.content.startswith("??"):
+    #         # update function
+    #         importlib.reload(test_message)
+    #         await message.channel.send("Reloaded")
+    #     else:
+    #         await test_message.handle_test_message(message)
+    #     return
     if ignore_message(message):
         print("Not my business")
         return
@@ -78,7 +93,9 @@ async def on_message(message: discord.Message):
                 response = await chatgpt.get_response_async(message_history)
 
             # check if user is in voice -> generate TTS if funds available
-            if message.author.voice and message.author.voice.channel:
+            if channel_config is not None and \
+                    "voice" in channel_config and channel_config["voice"] and \
+                    message.author.voice and message.author.voice.channel:
                 voice_client = await message.author.voice.channel.connect()
                 try:
                     if elevenlabs.get_character_remaining() > len(response):
@@ -224,6 +241,10 @@ async def get_channel_config(channel: discord.TextChannel):
         if "sys_msg_order" in description_json:
             channel_config["sys_msg_order"] = description_json["sys_msg_order"]
 
+        # check if voice enabled
+        if "voice" in description_json:
+            channel_config["voice"] = True if description_json["voice"] == "true" else False
+
         return channel_config
     except Exception as e:
         error_embed = discord.Embed(
@@ -241,8 +262,27 @@ async def generate_messagehistory(channel: discord.TextChannel, history_length: 
         # ignore messages starting with !! or too short
         if message.content.startswith("!!") or len(message.content) < 2:
             continue
+        # check if message contains image
+        image_url_regex = r"https?://[^\s]+\.(jpg|jpeg|png|gif)"
+        image_match = re.search(image_url_regex, message.content)
+        if len(message.attachments) > 0 or image_match:
+            image_url = ""
+            message_content_without_url = message.content
+            if len(message.attachments) > 0:
+                image_url = message.attachments[0].url.split("?")[0]
+            else:
+                image_url = image_match.group(0)
+                message_content_without_url = message.content.replace(
+                    image_url, "")
+            message_history.append({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": message_content_without_url},
+                    {"type": "image_url", "image_url": {"url": image_url}}
+                ]
+            })
         # combine adjacent messages from same author
-        if len(message_history) > 0 and \
+        elif len(message_history) > 0 and \
                 previous_author == message.author.id:
             # check for codeblock
             if str(message_history[-1]["content"]).startswith("```") and \
@@ -301,4 +341,5 @@ def ignore_message(message: discord.Message) -> bool:
     return False
 
 
-client.run(discord_token)
+if __name__ == "__main__":
+    client.run(discord_token)
