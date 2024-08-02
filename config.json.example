@@ -1,0 +1,14 @@
+{
+    "openai_token": "",
+    "elevenlabs_token": "",
+    "discord_token": "",
+    "guild_id": "",
+    "category_id": "",
+    "admin_user_id": "",
+    "model_list": [
+        "gpt-3.5-turbo",
+        "gpt-4",
+        "gpt-4o"
+    ],
+    "model_default": "gpt-4"
+}
