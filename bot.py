@@ -1,10 +1,9 @@
 from io import BytesIO
-import os
 import re
 import asyncio
 import json
-from typing import Set
-from dotenv import load_dotenv
+from typing import Dict, List, Set
+import json
 import discord
 
 # testing
@@ -16,27 +15,25 @@ from static_ffmpeg import run
 from text_generation import Chat
 from speech_generation import Voice
 
-load_dotenv()
+with open('config.json', 'r') as config_file:
+    config: Dict = json.load(config_file)
 
-discord_token = os.getenv("discord_token")
-openai_token = os.getenv("openai_token")
-elevenlabs_token = os.getenv("elevenlabs_token")
-guild_id = os.getenv("guild_id")
-category_id = os.getenv("category_id")
-admin_user_id = os.getenv("admin_user_id")
-model_version = os.getenv("model_version")
-
-model_list: [str] = ["davinci", "gpt-3.5-turbo-16k", "gpt-3.5-turbo",
-                     "gpt-3.5-turbo-1106", "gpt-4", "gpt-4-32k", "gpt-4-1106-preview", "gpt-4-vision-preview"]
-if model_version is None or model_version == "" or model_version not in model_list:
-    model_version = "gpt-4"
-print(f"Now using {model_version}")
+# Config Items that never should be None
+discord_token = config.get("discord_token")
+openai_token = config.get("openai_token")
+elevenlabs_token = config.get("elevenlabs_token")
+model_default = config.get("model_default", None)
+model_list = config.get("model_list", None)
+# Config Items that can be None
+guild_id = config.get("guild_id", None)
+category_id = config.get("category_id", None)
+admin_user_id = config.get("admin_user_id", None)
 
 intents = discord.Intents.default()
 intents.message_content = True
 
 client = discord.Client(intents=intents)
-chatgpt = Chat(openai_token, model_version)
+chatgpt = Chat(openai_token, model_default)
 elevenlabs = Voice(elevenlabs_token)
 
 
@@ -66,12 +63,18 @@ async def on_message(message: discord.Message):
             channel_config = await get_channel_config(message.channel)
             if channel_config is not None:
                 # generate history
-                if "history_length" in channel_config:
+                if "image_count_max" in channel_config and "history_length" in channel_config:
                     message_history = await generate_messagehistory(
-                        message.channel, channel_config["history_length"])
+                        channel=message.channel, history_length=channel_config["history_length"], image_max=channel_config["image_count_max"])
+                elif "history_length" in channel_config:
+                    message_history = await generate_messagehistory(
+                        channel=message.channel, history_length=channel_config["history_length"])
+                elif "image_count_max" in channel_config:
+                    message_history = await generate_messagehistory(
+                        channel=message.channel, image_max=channel_config["image_count_max"])
                 else:
                     message_history = await generate_messagehistory(
-                        message.channel)
+                        channel=message.channel)
 
                 # add system message if available
                 if "system_message" in channel_config:
@@ -233,6 +236,21 @@ async def get_channel_config(channel: discord.TextChannel):
                 await channel.send(embed=error_embed)
             print(f"Using history length: {channel_config['history_length']}")
 
+        # check for image count max
+        if "image_count_max" in description_json:
+            # check if image count max is valid
+            if description_json["image_count_max"] == 0:
+                channel_config["image_count_max"] = None
+            elif description_json["image_count_max"] in range(1, 100):
+                channel_config["image_count_max"] = description_json["image_count_max"]
+            else:
+                error_embed = discord.Embed(
+                    title="Error channel_config image_count_max", description=f"Invalid image count max: {description_json['image_count_max']}.\n" +
+                          "Allowed values: 1-99, 0 for unlimited", color=discord.Color.red())
+                await channel.send(embed=error_embed)
+            print(
+                f"Using image count max: {channel_config['image_count_max']}")
+
         # check for system message
         if "system_message" in description_json:
             channel_config["system_message"] = description_json["system_message"]
@@ -254,33 +272,45 @@ async def get_channel_config(channel: discord.TextChannel):
     return None
 
 
-async def generate_messagehistory(channel: discord.TextChannel, history_length: int = None):
+async def generate_messagehistory(channel: discord.TextChannel, history_length: int = None, image_count_max: int = None):
     print("Reading message history")
-    message_history = []
+    message_history: List[Dict] = []
     previous_author = 0
+    image_count = 0
     async for message in channel.history(limit=history_length):
         # ignore messages starting with !! or too short
         if message.content.startswith("!!") or len(message.content) < 2:
             continue
+        # fetch message username
+        message_user = None
+        if message.author is not client.user:
+            message_user = message.author.display_name.strip().replace(" ", "")
         # check if message contains image
         image_url_regex = r"https?://[^\s]+\.(jpg|jpeg|png|gif)"
         image_match = re.search(image_url_regex, message.content)
-        if len(message.attachments) > 0 or image_match:
+        if (len(message.attachments) > 0 or image_match) and (image_count_max is None or image_count < image_count_max):
             image_url = ""
             message_content_without_url = message.content
             if len(message.attachments) > 0:
-                image_url = message.attachments[0].url.split("?")[0]
+                image_url = message.attachments[0].url #.split("?")[0]
             else:
                 image_url = image_match.group(0)
                 message_content_without_url = message.content.replace(
                     image_url, "")
+            print(f"Adding Image to History: {image_url}")
             message_history.append({
                 "role": "user",
                 "content": [
                     {"type": "text", "text": message_content_without_url},
-                    {"type": "image_url", "image_url": {"url": image_url}}
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": image_url
+                        }
+                    }
                 ]
             })
+            image_count += 1
         # combine adjacent messages from same author
         elif len(message_history) > 0 and \
                 previous_author == message.author.id:
@@ -308,6 +338,8 @@ async def generate_messagehistory(channel: discord.TextChannel, history_length: 
                     message_history.append(
                         {"role": "user", "content": message.content})
         previous_author = message.author.id
+        if message_user is not None:
+            message_history[-1].update({"name": message_user})
 
     # reverse message history
     message_history.reverse()
