@@ -61,39 +61,33 @@ async def on_message(message: discord.Message):
         try:
             # generate ChatGPT prompt
             channel_config = await get_channel_config(message.channel)
-            if channel_config is not None:
-                # generate history
-                if "image_count_max" in channel_config and "history_length" in channel_config:
-                    message_history = await generate_messagehistory(
-                        channel=message.channel, history_length=channel_config["history_length"], image_max=channel_config["image_count_max"])
-                elif "history_length" in channel_config:
-                    message_history = await generate_messagehistory(
-                        channel=message.channel, history_length=channel_config["history_length"])
-                elif "image_count_max" in channel_config:
-                    message_history = await generate_messagehistory(
-                        channel=message.channel, image_max=channel_config["image_count_max"])
-                else:
-                    message_history = await generate_messagehistory(
-                        channel=message.channel)
 
-                # add system message if available
-                if "system_message" in channel_config:
-                    if "sys_msg_order" in channel_config and channel_config["sys_msg_order"] == "first":
-                        message_history.insert(
-                            0, {"role": "system", "content": channel_config["system_message"]})
-                    else:
-                        message_history.append(
-                            {"role": "system", "content": channel_config["system_message"]})
+            history_parameter_list = ['image_count_max', 'history_length']
+            generation_parameter_list = ['model_version', 'temperature']
 
-                # generate response
-                if "model_version" in channel_config:
-                    response = await chatgpt.get_response_async(
-                        message_history, channel_config["model_version"])
+            history_parameters = dict()
+            generation_parameters = dict()
+
+            history_parameters = {key: channel_config.get(
+                key, None) if channel_config is not None else None for key in history_parameter_list}
+
+            message_history = await generate_messagehistory(
+                channel=message.channel, **history_parameters)
+
+            system_message = channel_config.get("system_message", None) if channel_config is not None else None
+
+            if system_message is not None:
+                if channel_config.get("sys_msg_order", None) == "first":
+                    message_history.insert(
+                        0, {"role": "system", "content": channel_config["system_message"]})
                 else:
-                    response = await chatgpt.get_response_async(message_history)
-            else:
-                message_history = await generate_messagehistory(message.channel)
-                response = await chatgpt.get_response_async(message_history)
+                    message_history.append(
+                        {"role": "system", "content": channel_config["system_message"]})
+
+            generation_parameters = {key: channel_config.get(
+                key, None) if channel_config is not None else None for key in generation_parameter_list}
+
+            response = await chatgpt.get_response_async(message_history, **generation_parameters)
 
             # check if user is in voice -> generate TTS if funds available
             if channel_config is not None and \
