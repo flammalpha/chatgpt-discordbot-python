@@ -74,7 +74,8 @@ async def on_message(message: discord.Message):
             message_history = await generate_messagehistory(
                 channel=message.channel, **history_parameters)
 
-            system_message = channel_config.get("system_message", None) if channel_config is not None else None
+            system_message = channel_config.get(
+                "system_message", None) if channel_config is not None else None
 
             if system_message is not None:
                 if channel_config.get("sys_msg_order", None) == "first":
@@ -87,7 +88,7 @@ async def on_message(message: discord.Message):
             generation_parameters = {key: channel_config.get(
                 key, None) if channel_config is not None else None for key in generation_parameter_list}
 
-            response = await chatgpt.get_completion_async(message_history, **generation_parameters)
+            response = await chatgpt.get_response_async(message_history, **generation_parameters)
 
             # check if user is in voice -> generate TTS if funds available
             if channel_config is not None and \
@@ -286,7 +287,7 @@ async def generate_messagehistory(channel: discord.TextChannel, history_length: 
             image_url = ""
             message_content_without_url = message.content
             if len(message.attachments) > 0:
-                image_url = message.attachments[0].url #.split("?")[0]
+                image_url = message.attachments[0].url  # .split("?")[0]
             else:
                 image_url = image_match.group(0)
                 message_content_without_url = message.content.replace(
@@ -332,8 +333,8 @@ async def generate_messagehistory(channel: discord.TextChannel, history_length: 
                     message_history.append(
                         {"role": "user", "content": message.content})
         previous_author = message.author.id
-        if message_user is not None:
-            message_history[-1].update({"name": message_user})
+        # if message_user is not None: # New Responses API does not allow names per message
+        #     message_history[-1].update({"name": message_user})
 
     # reverse message history
     message_history.reverse()
