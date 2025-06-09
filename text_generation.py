@@ -48,8 +48,15 @@ class Chat:
 
     def calculate_tokens(self, messages: dict) -> int:
         '''Calculates an estimate of the tokens used by message history'''
-        counter = tiktoken.encoding_for_model(self.__model_version)
-        raise "Not implemented yet"
-        for entry in messages:
-            counter.count_tokens(entry.content)
-        return counter.count
+        encoding = tiktoken.encoding_for_model(self.__model_version)
+        tokens_per_message = 3
+        tokens_per_name = 1
+        num_tokens = 0
+        for message in messages:
+            num_tokens += tokens_per_message
+            for key, value in message.items():
+                num_tokens += len(encoding.encode(value))
+                if key == "name":
+                    num_tokens += tokens_per_name
+        num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
+        return num_tokens
