@@ -10,7 +10,7 @@ class Chat:
         self.__async_client = AsyncOpenAI(api_key=self.__api_key)
         self.__model_version = model_version
 
-    def get_response(self, message_history: dict, model_version: str = None) -> str:
+    def get_completion(self, message_history: dict, model_version: str = None) -> str:
         '''Fetches response from ChatGPT with entire message history'''
         fetch_model_version = model_version if model_version is not None else self.__model_version
 
@@ -24,7 +24,7 @@ class Chat:
         print(f"Response with {len(response)} characters")
         return response
 
-    async def get_response_async(self, message_history: dict, model_version: str = None, temperature: float = None) -> str:
+    async def get_completion_async(self, message_history: dict, model_version: str = None, temperature: float = None) -> str:
         '''Fetches response from ChatGPT with entire message history'''
         fetch_model_version = model_version if model_version is not None else self.__model_version
 

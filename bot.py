@@ -87,7 +87,7 @@ async def on_message(message: discord.Message):
             generation_parameters = {key: channel_config.get(
                 key, None) if channel_config is not None else None for key in generation_parameter_list}
 
-            response = await chatgpt.get_response_async(message_history, **generation_parameters)
+            response = await chatgpt.get_completion_async(message_history, **generation_parameters)
 
             # check if user is in voice -> generate TTS if funds available
             if channel_config is not None and \
