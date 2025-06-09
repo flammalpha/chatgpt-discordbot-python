@@ -1,6 +1,9 @@
 from typing import List
 from openai import AsyncOpenAI, OpenAI
 import tiktoken
+from logging import getLogger
+
+text_logger = getLogger(__name__)
 
 
 class Chat:
@@ -14,42 +17,43 @@ class Chat:
         '''Fetches response from ChatGPT with entire message history'''
         fetch_model_version = model_version if model_version is not None else self.__model_version
 
-        print("Fetching response from ChatGPT")
+        text_logger.debug("Fetching response from ChatGPT")
         completion = self.__client.chat.completions.create(
             model=fetch_model_version, messages=message_history)
 
         response = completion.choices[0].message.content
 
-        # print(response)
-        print(f"Response with {len(response)} characters")
+        # text_logger.debug(response)
+        text_logger.info(f"Response with {len(response)} characters")
         return response
 
     async def get_completion_async(self, message_history: dict, model_version: str = None, temperature: float = None) -> str:
         '''Fetches response from ChatGPT with entire message history'''
         fetch_model_version = model_version if model_version is not None else self.__model_version
 
-        print("Fetching response from ChatGPT")
+        text_logger.debug("Fetching response from ChatGPT")
         completion = await self.__async_client.chat.completions.create(
             model=fetch_model_version, temperature=temperature,
             messages=message_history)
 
         response = completion.choices[0].message.content
 
-        # print(response)
-        print(f"Response with {len(response)} characters")
+        # text_logger.debug(response)
+        text_logger.info(f"Response with {len(response)} characters")
         return response
 
-    async def get_response_async(self, message_history: dict, model_version: str = None, temperature: float = None) -> str:
+    async def get_response_async(self, message_history: dict, model_version: str = None, temperature: float = None, tools: List[str] = None, tool_choice: str = None) -> str:
         '''Fetches response from ChatGPT with entire message history'''
         fetch_model_version = model_version if model_version is not None else self.__model_version
 
-        print("Fetching response from ChatGPT")
+        text_logger.debug("Fetching response from ChatGPT")
         response = await self.__async_client.responses.create(
             model=fetch_model_version, temperature=temperature,
+            tools=tools, tool_choice=tool_choice,
             input=message_history
         )
 
-        print(f"Response with {len(response.output_text)} characters")
+        text_logger.info(f"Response with {len(response.output_text)} characters")
         return response.output_text
 
     def get_model_list(self) -> List[str]:

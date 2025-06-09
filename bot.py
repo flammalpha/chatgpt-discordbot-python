@@ -1,3 +1,6 @@
+from speech_generation import Voice
+from text_generation import Chat
+from static_ffmpeg import run
 from io import BytesIO
 import re
 import asyncio
@@ -5,15 +8,17 @@ import json
 from typing import Dict, List, Set
 import json
 import discord
+from logging import getLogger
+from logging_config import setup_logger
+
+setup_logger()
+
+bot_logger = getLogger(__name__)
 
 # testing
 # import importlib
 # import test_message
 
-from static_ffmpeg import run
-
-from text_generation import Chat
-from speech_generation import Voice
 
 with open('config.json', 'r') as config_file:
     config: Dict = json.load(config_file)
@@ -39,7 +44,7 @@ elevenlabs = Voice(elevenlabs_token)
 
 @client.event
 async def on_ready():
-    print(f'We have logged in as {client.user}')
+    bot_logger.info(f'We have logged in as {client.user}')
 
 
 @client.event
@@ -53,17 +58,18 @@ async def on_message(message: discord.Message):
     #         await test_message.handle_test_message(message)
     #     return
     if ignore_message(message):
-        print("Not my business")
+        bot_logger.debug("Not my business")
         return
 
-    print("Working...")
+    bot_logger.debug("Working...")
     async with message.channel.typing():
         try:
             # generate ChatGPT prompt
             channel_config = await get_channel_config(message.channel)
 
             history_parameter_list = ['image_count_max', 'history_length']
-            generation_parameter_list = ['model_version', 'temperature']
+            generation_parameter_list = [
+                'model_version', 'temperature', 'tools', 'tool_choice']
 
             history_parameters = dict()
             generation_parameters = dict()
@@ -156,12 +162,12 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
                 if deleting:
                     deletion_messages_list.add(message)
             await guild_channel.delete_messages(deletion_messages_list)
-            print(f"Deleted {len(deletion_messages_list)} messages!")
+            bot_logger.info(f"Deleted {len(deletion_messages_list)} messages!")
     elif (payload.emoji.name == exclamation_reaction) and \
             (admin_user_id is None or payload.user_id == int(admin_user_id)):
         pass
     else:
-        print("Reaction added")
+        bot_logger.debug("Reaction added")
 
 
 async def send_message_blocks(channel: discord.TextChannel, content: str):
@@ -195,73 +201,70 @@ async def send_message_blocks(channel: discord.TextChannel, content: str):
     await channel.send(remaining_content)
 
 
+def ensure_bool(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        if value.lower() in ("true", "1", "yes"):
+            return True
+        elif value.lower() in ("false", "0", "no"):
+            return False
+    raise ValueError(f"{value} is not a boolean or a recognizable string boolean")
+
+
 async def get_channel_config(channel: discord.TextChannel):
-    print("Reading channel config from description")
+    bot_logger.debug("Reading channel config from description")
     if channel.topic is None:
         return None
     # jsonify description
     description_json = json.loads(channel.topic, strict=False)
 
-    channel_config = {}
     # check for model version
     if "model_version" in description_json:
         # check if model version is valid
-        if description_json["model_version"] in model_list:
-            channel_config["model_version"] = description_json["model_version"]
-        else:
+        if description_json["model_version"] not in model_list:
             model_list_str = ", ".join(model_list)
-            error_embed = discord.Embed(
-                title="Error channel_config model_version", description=f"Invalid model version: {description_json['model_version']}.\n" +
-                f"Allowed values: {model_list_str}", color=discord.Color.red())
-            await channel.send(embed=error_embed)
-        print(f"Using model version: {channel_config['model_version']}")
+            raise ValueError("Error channel_config model_version",
+                             f"Invalid model version: {description_json['model_version']}.\nAllowed values: {model_list_str}")
+        bot_logger.debug(f"Using model version: {description_json['model_version']}")
 
     # check for message history length
     if "history_length" in description_json:
         # check if history length is valid
         if description_json["history_length"] == 0:
-            channel_config["history_length"] = None
-        elif description_json["history_length"] in range(1, 100):
-            channel_config["history_length"] = description_json["history_length"]
-        else:
-            error_embed = discord.Embed(
-                title="Error channel_config history_length", description=f"Invalid history length: {description_json['history_length']}.\n" +
-                        "Allowed values: 1-99, 0 for unlimited", color=discord.Color.red())
-            await channel.send(embed=error_embed)
-        print(f"Using history length: {channel_config['history_length']}")
+            description_json["history_length"] = None
+        elif description_json["history_length"] not in range(1, 100):
+            raise ValueError("Error channel_config history_length",
+                             f"Invalid history length: {description_json['history_length']}.\nAllowed values: 1-99, 0 for unlimited")
+        bot_logger.debug(f"Using history length: {description_json['history_length']}")
 
     # check for image count max
     if "image_count_max" in description_json:
         # check if image count max is valid
         if description_json["image_count_max"] == 0:
-            channel_config["image_count_max"] = None
-        elif description_json["image_count_max"] in range(1, 100):
-            channel_config["image_count_max"] = description_json["image_count_max"]
-        else:
-            error_embed = discord.Embed(
-                title="Error channel_config image_count_max", description=f"Invalid image count max: {description_json['image_count_max']}.\n" +
-                        "Allowed values: 1-99, 0 for unlimited", color=discord.Color.red())
-            await channel.send(embed=error_embed)
-        print(
-            f"Using image count max: {channel_config['image_count_max']}")
+            description_json["image_count_max"] = None
+        elif description_json["image_count_max"] not in range(1, 100):
+            raise ValueError("Error channel_config image_count_max",
+                             f"Invalid image count max: {description_json['image_count_max']}.\nAllowed values: 1-99, 0 for unlimited")
+        bot_logger.debug(f"Using image count max: {description_json['image_count_max']}")
 
     # check for system message
     if "system_message" in description_json:
-        channel_config["system_message"] = description_json["system_message"]
+        bot_logger.debug(f"Using system message: {description_json['system_message']}")
 
     # check for system message order
     if "sys_msg_order" in description_json:
-        channel_config["sys_msg_order"] = description_json["sys_msg_order"]
+        bot_logger.debug(f"Using system message order: {description_json['sys_msg_order']}")
 
     # check if voice enabled
     if "voice" in description_json:
-        channel_config["voice"] = True if description_json["voice"] == "true" else False
+        description_json["voice"] = ensure_bool(description_json["voice"])
 
-    return channel_config
+    return description_json
 
 
 async def generate_messagehistory(channel: discord.TextChannel, history_length: int = None, image_count_max: int = None):
-    print("Reading message history")
+    bot_logger.debug("Reading message history")
     message_history: List[Dict] = []
     previous_author = 0
     image_count = 0
@@ -285,7 +288,7 @@ async def generate_messagehistory(channel: discord.TextChannel, history_length: 
                 image_url = image_match.group(0)
                 message_content_without_url = message.content.replace(
                     image_url, "")
-            print(f"Adding Image to History: {image_url}")
+            bot_logger.debug(f"Adding Image to History: {image_url}")
             message_history.append({
                 "role": "user",
                 "content": [
@@ -339,24 +342,24 @@ def ignore_message(message: discord.Message) -> bool:
     chat inside certain guild with category,
     aswell as system prompt'''
     if message.content.startswith("!!"):
-        print("Ignore specified")
+        bot_logger.debug("Ignore specified")
         return True
     if message.author.bot or message.author.id == client.user.id:
-        print("Bot detected")
+        bot_logger.debug("Bot detected")
         return True
     if message.guild is None or \
             guild_id is not None and message.guild.id != int(guild_id):
-        print(f"Wrong or no guild")
+        bot_logger.debug(f"Wrong or no guild")
         return True
     if message.channel.category is None or \
             category_id is not None and message.channel.category.id != int(category_id):
-        print("Not in Category")
+        bot_logger.debug("Not in Category")
         return True
     if message.content.startswith('{') and message.content.endswith("}"):
-        print("System message")
+        bot_logger.debug("System message")
         return True
     if len(message.content) < 2:
-        print("Empty message")
+        bot_logger.debug("Empty message")
         return True
     return False
 

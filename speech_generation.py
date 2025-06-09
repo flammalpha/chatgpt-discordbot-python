@@ -1,4 +1,8 @@
 from elevenlabs.client import ElevenLabs
+from logging import getLogger
+
+voice_logger = getLogger(__name__)
+
 
 class Voice:
     def __init__(self, token: str, name: str = "Glinda") -> None:
@@ -9,16 +13,17 @@ class Voice:
     def get_voice_bytes(self, prompt: str) -> bytes:
         remaining = self.get_character_remaining()
         if remaining >= len(prompt):
-            print("Fetching audio from ElevenLabs")
-            print(
+            voice_logger.debug("Fetching audio from ElevenLabs")
+            voice_logger.debug(
                 f"Using {len(prompt)} characters out of {remaining} remaining.")
-            audio_bytes = self.__client.generate(prompt, voice=self.__voice_name)
-            print(
+            audio_bytes = self.__client.generate(
+                prompt, voice=self.__voice_name)
+            voice_logger.debug(
                 f"Remaining characters: {self.get_character_remaining()}")
             return audio_bytes
         else:
-            print("You do not have enough characters left this month for this voice.")
-            print(f"(Needed: {len(prompt)} / Remaining: {remaining})")
+            voice_logger.warning("You do not have enough characters left this month for this voice.",
+                                 f"(Needed: {len(prompt)} / Remaining: {remaining})")
         raise Exception("Unable to generate voice")
 
     def get_voice_bytes_history(self, prompt: str) -> bytes:
@@ -33,7 +38,7 @@ class Voice:
         for historyItem in self.__client.history.get_all().items:
             if historyItem.text == prompt:
                 historyItem.delete()
-                print("Successfully deleted voice")
+                voice_logger.debug("Successfully deleted voice")
                 return
         raise Exception("Could not find voice")
 
@@ -42,5 +47,6 @@ class Voice:
         limit = subscription.character_limit
         current = subscription.character_count
         percentage = current / limit * 100
-        print(f"Used up {current} out of {limit} characters ({percentage}%).")
+        voice_logger.info(
+            f"Used up {current} out of {limit} characters ({percentage}%).")
         return limit - current

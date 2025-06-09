@@ -1,11 +1,14 @@
 import re
 import discord
+from logging import getLogger
+
+test_logger = getLogger(__name__)
 
 async def handle_test_message(message: discord.Message):
-    print(message.content)
+    test_logger.debug(message.content)
     if len(message.attachments) > 0:
         url = message.attachments[0].url.split("?")[0]
-        print(message.content)
+        test_logger.debug(message.content)
         await handle_image(message, url)
         return
     
@@ -13,7 +16,7 @@ async def handle_test_message(message: discord.Message):
     url_regex = r"https?://[^\s]+"
     match = re.search(url_regex, message.content)
     if match:
-        print("URL found")
+        test_logger.debug("URL found")
         url = match.group(0)
         await handle_image(message, url)
     else:
@@ -21,5 +24,5 @@ async def handle_test_message(message: discord.Message):
 
 
 async def handle_image(message: discord.Message, url: str):
-    print(message.content)
+    test_logger.debug(message.content)
     await message.channel.send(url)
