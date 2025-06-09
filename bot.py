@@ -199,72 +199,65 @@ async def get_channel_config(channel: discord.TextChannel):
     print("Reading channel config from description")
     if channel.topic is None:
         return None
-    try:
-        # jsonify description
-        description_json = json.loads(channel.topic, strict=False)
+    # jsonify description
+    description_json = json.loads(channel.topic, strict=False)
 
-        channel_config = {}
-        # check for model version
-        if "model_version" in description_json:
-            # check if model version is valid
-            if description_json["model_version"] in model_list:
-                channel_config["model_version"] = description_json["model_version"]
-            else:
-                model_list_str = ", ".join(model_list)
-                error_embed = discord.Embed(
-                    title="Error channel_config model_version", description=f"Invalid model version: {description_json['model_version']}.\n" +
-                    f"Allowed values: {model_list_str}", color=discord.Color.red())
-                await channel.send(embed=error_embed)
-            print(f"Using model version: {channel_config['model_version']}")
+    channel_config = {}
+    # check for model version
+    if "model_version" in description_json:
+        # check if model version is valid
+        if description_json["model_version"] in model_list:
+            channel_config["model_version"] = description_json["model_version"]
+        else:
+            model_list_str = ", ".join(model_list)
+            error_embed = discord.Embed(
+                title="Error channel_config model_version", description=f"Invalid model version: {description_json['model_version']}.\n" +
+                f"Allowed values: {model_list_str}", color=discord.Color.red())
+            await channel.send(embed=error_embed)
+        print(f"Using model version: {channel_config['model_version']}")
 
-        # check for message history length
-        if "history_length" in description_json:
-            # check if history length is valid
-            if description_json["history_length"] == 0:
-                channel_config["history_length"] = None
-            elif description_json["history_length"] in range(1, 100):
-                channel_config["history_length"] = description_json["history_length"]
-            else:
-                error_embed = discord.Embed(
-                    title="Error channel_config history_length", description=f"Invalid history length: {description_json['history_length']}.\n" +
-                          "Allowed values: 1-99, 0 for unlimited", color=discord.Color.red())
-                await channel.send(embed=error_embed)
-            print(f"Using history length: {channel_config['history_length']}")
+    # check for message history length
+    if "history_length" in description_json:
+        # check if history length is valid
+        if description_json["history_length"] == 0:
+            channel_config["history_length"] = None
+        elif description_json["history_length"] in range(1, 100):
+            channel_config["history_length"] = description_json["history_length"]
+        else:
+            error_embed = discord.Embed(
+                title="Error channel_config history_length", description=f"Invalid history length: {description_json['history_length']}.\n" +
+                        "Allowed values: 1-99, 0 for unlimited", color=discord.Color.red())
+            await channel.send(embed=error_embed)
+        print(f"Using history length: {channel_config['history_length']}")
 
-        # check for image count max
-        if "image_count_max" in description_json:
-            # check if image count max is valid
-            if description_json["image_count_max"] == 0:
-                channel_config["image_count_max"] = None
-            elif description_json["image_count_max"] in range(1, 100):
-                channel_config["image_count_max"] = description_json["image_count_max"]
-            else:
-                error_embed = discord.Embed(
-                    title="Error channel_config image_count_max", description=f"Invalid image count max: {description_json['image_count_max']}.\n" +
-                          "Allowed values: 1-99, 0 for unlimited", color=discord.Color.red())
-                await channel.send(embed=error_embed)
-            print(
-                f"Using image count max: {channel_config['image_count_max']}")
+    # check for image count max
+    if "image_count_max" in description_json:
+        # check if image count max is valid
+        if description_json["image_count_max"] == 0:
+            channel_config["image_count_max"] = None
+        elif description_json["image_count_max"] in range(1, 100):
+            channel_config["image_count_max"] = description_json["image_count_max"]
+        else:
+            error_embed = discord.Embed(
+                title="Error channel_config image_count_max", description=f"Invalid image count max: {description_json['image_count_max']}.\n" +
+                        "Allowed values: 1-99, 0 for unlimited", color=discord.Color.red())
+            await channel.send(embed=error_embed)
+        print(
+            f"Using image count max: {channel_config['image_count_max']}")
 
-        # check for system message
-        if "system_message" in description_json:
-            channel_config["system_message"] = description_json["system_message"]
+    # check for system message
+    if "system_message" in description_json:
+        channel_config["system_message"] = description_json["system_message"]
 
-        # check for system message order
-        if "sys_msg_order" in description_json:
-            channel_config["sys_msg_order"] = description_json["sys_msg_order"]
+    # check for system message order
+    if "sys_msg_order" in description_json:
+        channel_config["sys_msg_order"] = description_json["sys_msg_order"]
 
-        # check if voice enabled
-        if "voice" in description_json:
-            channel_config["voice"] = True if description_json["voice"] == "true" else False
+    # check if voice enabled
+    if "voice" in description_json:
+        channel_config["voice"] = True if description_json["voice"] == "true" else False
 
-        return channel_config
-    except Exception as e:
-        error_embed = discord.Embed(
-            title="Error channel_config", description=f"```{str(e)}```", color=discord.Color.red())
-        await channel.send(embed=error_embed)
-        print(f"Error reading description: {e}")
-    return None
+    return channel_config
 
 
 async def generate_messagehistory(channel: discord.TextChannel, history_length: int = None, image_count_max: int = None):
