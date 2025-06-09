@@ -18,15 +18,18 @@
 
 ## How-To
 
-Create a .env file with following content:
+Create a `config.json` file according to the `config.json.example` file and fill in at least these values:
 
 ```plain
-openai_token=xxx
-elevenlabs_token=xxx
-discord_token=xxx
-guild_id=optional
-category_id=optional
-admin_user_id=optional
+    ...
+    "openai_token": "",
+    "elevenlabs_token": "",
+    "discord_token": "",
+    "model_list": [
+        "gpt-4.1"
+    ],
+    "model_default": "gpt-4.1",
+    ...
 ```
 
 ## Ressources
