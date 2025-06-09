@@ -33,6 +33,8 @@ model_list = config.get("model_list", None)
 guild_id = config.get("guild_id", None)
 category_id = config.get("category_id", None)
 admin_user_id = config.get("admin_user_id", None)
+allowed_tools = config.get("allowed_tools", None)
+allowed_choices = config.get("allowed_tool_choice", None)
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -118,11 +120,13 @@ async def on_message(message: discord.Message):
                     while voice_client.is_playing():
                         pass
                 except Exception as e:
+                    bot_logger.error("Cannot play voice", e)
                     error_embed = discord.Embed(
                         title="Error playing voice", description=f"```{str(e)}```", color=discord.Color.red())
                     await message.channel.send(embed=error_embed)
                 await voice_client.disconnect()
         except Exception as e:
+            bot_logger.error("Cannot generate message", e)
             error_embed = discord.Embed(
                 title="Error on_message", description=f"```{str(e)}```", color=discord.Color.red())
             await message.channel.send(embed=error_embed)
@@ -197,6 +201,8 @@ async def send_message_blocks(channel: discord.TextChannel, content: str):
             # check what comes first - new line or period
             current_block = current_block[:max(last_line, last_period)]
             remaining_content = remaining_content[len(current_block):]
+        bot_logger.info(
+            f"Sending message {(content-remaining_content)/2000}/{content/2000}")
         await channel.send(current_block)
     await channel.send(remaining_content)
 
@@ -209,7 +215,8 @@ def ensure_bool(value):
             return True
         elif value.lower() in ("false", "0", "no"):
             return False
-    raise ValueError(f"{value} is not a boolean or a recognizable string boolean")
+    raise ValueError(
+        f"{value} is not a boolean or a recognizable string boolean")
 
 
 async def get_channel_config(channel: discord.TextChannel):
@@ -217,7 +224,12 @@ async def get_channel_config(channel: discord.TextChannel):
     if channel.topic is None:
         return None
     # jsonify description
-    description_json = json.loads(channel.topic, strict=False)
+    description_json = dict()
+    try:
+        description_json = json.loads(channel.topic, strict=False)
+    except Exception as e:
+        bot_logger.error("Cannot parse channel status message", e)
+        raise ValueError(f"Cannot parse channel status message", e)
 
     # check for model version
     if "model_version" in description_json:
@@ -226,7 +238,8 @@ async def get_channel_config(channel: discord.TextChannel):
             model_list_str = ", ".join(model_list)
             raise ValueError("Error channel_config model_version",
                              f"Invalid model version: {description_json['model_version']}.\nAllowed values: {model_list_str}")
-        bot_logger.debug(f"Using model version: {description_json['model_version']}")
+        bot_logger.debug(
+            f"Using model version: {description_json['model_version']}")
 
     # check for message history length
     if "history_length" in description_json:
@@ -236,7 +249,8 @@ async def get_channel_config(channel: discord.TextChannel):
         elif description_json["history_length"] not in range(1, 100):
             raise ValueError("Error channel_config history_length",
                              f"Invalid history length: {description_json['history_length']}.\nAllowed values: 1-99, 0 for unlimited")
-        bot_logger.debug(f"Using history length: {description_json['history_length']}")
+        bot_logger.debug(
+            f"Using history length: {description_json['history_length']}")
 
     # check for image count max
     if "image_count_max" in description_json:
@@ -246,19 +260,41 @@ async def get_channel_config(channel: discord.TextChannel):
         elif description_json["image_count_max"] not in range(1, 100):
             raise ValueError("Error channel_config image_count_max",
                              f"Invalid image count max: {description_json['image_count_max']}.\nAllowed values: 1-99, 0 for unlimited")
-        bot_logger.debug(f"Using image count max: {description_json['image_count_max']}")
+        bot_logger.debug(
+            f"Using image count max: {description_json['image_count_max']}")
 
     # check for system message
     if "system_message" in description_json:
-        bot_logger.debug(f"Using system message: {description_json['system_message']}")
+        bot_logger.debug(
+            f"Using system message: {description_json['system_message']}")
 
     # check for system message order
     if "sys_msg_order" in description_json:
-        bot_logger.debug(f"Using system message order: {description_json['sys_msg_order']}")
+        bot_logger.debug(
+            f"Using system message order: {description_json['sys_msg_order']}")
 
     # check if voice enabled
     if "voice" in description_json:
         description_json["voice"] = ensure_bool(description_json["voice"])
+
+    if "tools" in description_json:
+        # Currently only handles built-in tools
+        if isinstance(description_json["tools"], list) and set(description_json["tools"]).issubset(allowed_tools):
+            tool_list = list()
+            for tool in description_json["tools"]:
+                tool_list.append({"type": tool})
+            description_json["tools"] = tool_list # converted to built-in tool
+        else:
+            raise ValueError("Error channel_config tools",
+                             f"Invalid set of tools specified: {description_json["tools"]}.\nAllowed options: {allowed_tools}")
+        bot_logger.debug(f"Using tools: {description_json["tools"]}")
+
+    if "tool_choice" in description_json:
+        if description_json["tool_choice"] not in allowed_choices:
+            raise ValueError("Error channel_config tool_choice",
+                             f"Invalid tool choice: {description_json["tool_choice"]}.\nAllowed options: {allowed_choices}")
+        bot_logger.debug(
+            f"Using tool_choice: {description_json["tool_choice"]}")
 
     return description_json
 

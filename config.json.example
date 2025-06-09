@@ -10,5 +10,13 @@
         "gpt-4",
         "gpt-4o"
     ],
-    "model_default": "gpt-4"
+    "model_default": "gpt-4",
+    "allowed_tools": [
+        "image_generation"
+    ],
+    "allowed_tool_choice": [
+        "none",
+        "auto",
+        "required"
+    ]
 }
