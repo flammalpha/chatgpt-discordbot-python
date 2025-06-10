@@ -42,7 +42,7 @@ class Chat:
         text_logger.info(f"Response with {len(response)} characters")
         return response
 
-    async def get_response_async(self, message_history: dict, model_version: str = None, temperature: float = None, tools: List[str] = None, tool_choice: str = None) -> str:
+    async def get_response_async(self, message_history: dict, model_version: str = None, temperature: float = None, tools: List = None, tool_choice: str = None) -> str:
         '''Fetches response from ChatGPT with entire message history'''
         fetch_model_version = model_version if model_version is not None else self.__model_version
 
@@ -53,8 +53,12 @@ class Chat:
             input=message_history
         )
 
-        text_logger.info(f"Response with {len(response.output_text)} characters")
-        return response.output_text
+        image_list: List = [
+            output.result for output in response.output if output.type == "image_generation_call"]
+
+        text_logger.info(
+            f"Response with {len(response.output_text)} characters and {len(image_list) if image_list is not None else 0} images.")
+        return response.output_text, image_list
 
     def get_model_list(self) -> List[str]:
         model_list = self.__client.models.list()._get_page_items()

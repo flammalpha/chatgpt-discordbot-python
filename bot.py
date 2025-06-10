@@ -1,3 +1,4 @@
+import base64
 from speech_generation import Voice
 from text_generation import Chat
 from static_ffmpeg import run
@@ -65,6 +66,8 @@ async def on_message(message: discord.Message):
 
     bot_logger.debug("Working...")
     async with message.channel.typing():
+        response = None
+        images = None
         try:
             # generate ChatGPT prompt
             channel_config = await get_channel_config(message.channel)
@@ -96,7 +99,7 @@ async def on_message(message: discord.Message):
             generation_parameters = {key: channel_config.get(
                 key, None) if channel_config is not None else None for key in generation_parameter_list}
 
-            response = await chatgpt.get_response_async(message_history, **generation_parameters)
+            response, images = await chatgpt.get_response_async(message_history, **generation_parameters)
 
             # check if user is in voice -> generate TTS if funds available
             if channel_config is not None and \
@@ -130,8 +133,11 @@ async def on_message(message: discord.Message):
             error_embed = discord.Embed(
                 title="Error on_message", description=f"```{str(e)}```", color=discord.Color.red())
             await message.channel.send(embed=error_embed)
-    if 'response' in locals():
+    if response is not None:
         await send_message_blocks(message.channel, response)
+    if images is not None and len(images) > 0:
+        await send_images(message.channel, images)
+
 
 
 @client.event
@@ -205,6 +211,16 @@ async def send_message_blocks(channel: discord.TextChannel, content: str):
             f"Sending message {(content-remaining_content)/2000}/{content/2000}")
         await channel.send(current_block)
     await channel.send(remaining_content)
+
+
+async def send_images(channel: discord.TextChannel, images: List):
+    for image in images:
+        image_data = base64.b64decode(image)
+        image_bytes = BytesIO(image_data)
+        image_bytes.seek(0)
+
+        discord_file = discord.File(fp=image_bytes, filename="image.png")
+        await channel.send(file=discord_file)
 
 
 def ensure_bool(value):
