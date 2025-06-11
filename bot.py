@@ -306,15 +306,15 @@ async def get_channel_config(channel: discord.TextChannel):
             description_json["tools"] = tool_list # converted to built-in tool
         else:
             raise ValueError("Error channel_config tools",
-                             f"Invalid set of tools specified: {description_json["tools"]}.\nAllowed options: {ALLOWED_TOOLS}")
-        bot_logger.debug(f"Using tools: {description_json["tools"]}")
+                             f"Invalid set of tools specified: {description_json['tools']}.\nAllowed options: {ALLOWED_TOOLS}")
+        bot_logger.debug(f"Using tools: {description_json['tools']}")
 
     if "tool_choice" in description_json:
         if description_json["tool_choice"] not in ALLOWED_CHOICES:
             raise ValueError("Error channel_config tool_choice",
-                             f"Invalid tool choice: {description_json["tool_choice"]}.\nAllowed options: {ALLOWED_CHOICES}")
+                             f"Invalid tool choice: {description_json['tool_choice']}.\nAllowed options: {ALLOWED_CHOICES}")
         bot_logger.debug(
-            f"Using tool_choice: {description_json["tool_choice"]}")
+            f"Using tool_choice: {description_json['tool_choice']}")
 
     return description_json
 
