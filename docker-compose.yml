@@ -7,4 +7,6 @@ services:
       dockerfile: dockerfile
     image: chatgpt_bot
     container_name: chatgpt_bot
+    volumes:
+      - ./logs:/app/logs
     restart: always
