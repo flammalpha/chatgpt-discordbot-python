@@ -42,7 +42,7 @@ ALLOWED_CHOICES = config.get("allowed_tool_choice", None)
 MAX_HISTORY_LENGTH = config.get("max_history_length", 100)
 MAX_IMAGE_COUNT = config.get("max_image_count", 100)
 # Constants
-MAX_MESSAGE_SIZE = 2000 # Discord message length maximum
+MAX_MESSAGE_SIZE = 2000  # Discord message length maximum
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -146,7 +146,6 @@ async def on_message(message: discord.Message):
         await send_images(message.channel, images)
 
 
-
 @client.event
 async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     cross_reaction = "\u274c"
@@ -186,6 +185,7 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     else:
         bot_logger.debug("Reaction added")
 
+
 async def send_message_blocks(channel: discord.TextChannel, content: str):
     remaining_content = content
     while len(remaining_content) > MAX_MESSAGE_SIZE:
@@ -209,10 +209,11 @@ async def send_message_blocks(channel: discord.TextChannel, content: str):
         # cut neatly on last period
         else:
             last_line = current_block.rfind("\n")
-            last_period = current_block.rfind(". ") + (1 if ". " in current_block else 0)  # include period
+            last_period = current_block.rfind(
+                ". ") + (1 if ". " in current_block else 0)  # include period
             # check what comes first - new line or period
             cutoff_index = max(last_line, last_period)
-            if cutoff_index < 1500: # somehow last period and new-line are more than 500 characters behind? reduce message waste
+            if cutoff_index < 1500:  # somehow last period and new-line are more than 500 characters behind? reduce message waste
                 last_space = current_block.rfind(" ")
                 cutoff_index = max(last_space, cutoff_index)
             current_block = current_block[:cutoff_index]
@@ -309,7 +310,7 @@ async def get_channel_config(channel: discord.TextChannel):
             tool_list = list()
             for tool in description_json["tools"]:
                 tool_list.append({"type": tool})
-            description_json["tools"] = tool_list # converted to built-in tool
+            description_json["tools"] = tool_list  # converted to built-in tool
         else:
             raise ValueError("Error channel_config tools",
                              f"Invalid set of tools specified: {description_json['tools']}.\nAllowed options: {ALLOWED_TOOLS}")
