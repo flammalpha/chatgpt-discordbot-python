@@ -25,24 +25,29 @@ with open('config.json', 'r') as config_file:
     config: Dict = json.load(config_file)
 
 # Config Items that never should be None
-discord_token = config.get("discord_token")
-openai_token = config.get("openai_token")
-elevenlabs_token = config.get("elevenlabs_token")
-model_default = config.get("model_default", None)
-model_list = config.get("model_list", None)
+DISCORD_TOKEN = config.get("discord_token")
+OPENAI_TOKEN = config.get("openai_token")
+ELEVENLABS_TOKEN = config.get("elevenlabs_token")
+MODEL_DEFAULT = config.get("model_default", None)
+MODEL_LIST = config.get("model_list", None)
 # Config Items that can be None
-guild_id = config.get("guild_id", None)
-category_id = config.get("category_id", None)
-admin_user_id = config.get("admin_user_id", None)
-allowed_tools = config.get("allowed_tools", None)
-allowed_choices = config.get("allowed_tool_choice", None)
+GUILD_ID = config.get("guild_id", None)
+CATEGORY_ID = config.get("category_id", None)
+ADMIN_USER_ID = config.get("admin_user_id", None)
+ALLOWED_TOOLS = config.get("allowed_tools", None)
+ALLOWED_CHOICES = config.get("allowed_tool_choice", None)
+# General items that normally won't be defined
+MAX_HISTORY_LENGTH = config.get("max_history_length", 100)
+MAX_IMAGE_COUNT = config.get("max_image_count", 100)
+# Constants
+MAX_MESSAGE_SIZE = 2000 # Discord message length maximum
 
 intents = discord.Intents.default()
 intents.message_content = True
 
 client = discord.Client(intents=intents)
-chatgpt = Chat(openai_token, model_default)
-elevenlabs = Voice(elevenlabs_token)
+chatgpt = Chat(OPENAI_TOKEN, MODEL_DEFAULT)
+elevenlabs = Voice(ELEVENLABS_TOKEN)
 
 
 @client.event
@@ -145,15 +150,15 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     cross_reaction = "\u274c"
     exclamation_reaction = "\u203c"
     if (payload.emoji.name == cross_reaction) and \
-            (admin_user_id is None or payload.user_id == int(admin_user_id)):
+            (ADMIN_USER_ID is None or payload.user_id == int(ADMIN_USER_ID)):
         deletion_messages_list: Set[discord.Message] = set()
 
         guild_channel = client.get_guild(
             payload.guild_id).get_channel(payload.channel_id)
         admin_user = None
-        if admin_user_id is not None:
+        if ADMIN_USER_ID is not None:
             admin_user = client.get_guild(
-                payload.guild_id).get_member(int(admin_user_id))
+                payload.guild_id).get_member(int(ADMIN_USER_ID))
         # reacted_message = await guild_channel.fetch_message(payload.message_id)
         # Get message history to check for multiple reactions
         async for message in guild_channel.history(limit=None, oldest_first=True):
@@ -174,16 +179,15 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
             await guild_channel.delete_messages(deletion_messages_list)
             bot_logger.info(f"Deleted {len(deletion_messages_list)} messages!")
     elif (payload.emoji.name == exclamation_reaction) and \
-            (admin_user_id is None or payload.user_id == int(admin_user_id)):
+            (ADMIN_USER_ID is None or payload.user_id == int(ADMIN_USER_ID)):
         pass
     else:
         bot_logger.debug("Reaction added")
 
-
 async def send_message_blocks(channel: discord.TextChannel, content: str):
     remaining_content = content
-    while len(remaining_content) > 2000:
-        current_block = remaining_content[:2000]
+    while len(remaining_content) > MAX_MESSAGE_SIZE:
+        current_block = remaining_content[:MAX_MESSAGE_SIZE]
         # check for codeblock then cut neatly on a line inside block while leaving space for closing brackets
         while len(current_block) > 1997 and current_block.count("```") % 2 > 0:
             current_block = current_block.rsplit(
@@ -208,7 +212,7 @@ async def send_message_blocks(channel: discord.TextChannel, content: str):
             current_block = current_block[:max(last_line, last_period)]
             remaining_content = remaining_content[len(current_block):]
         bot_logger.info(
-            f"Sending message {(content-remaining_content)/2000}/{content/2000}")
+            f"Sending message {(content-remaining_content)/MAX_MESSAGE_SIZE}/{content/MAX_MESSAGE_SIZE}")
         await channel.send(current_block)
     await channel.send(remaining_content)
 
@@ -250,8 +254,8 @@ async def get_channel_config(channel: discord.TextChannel):
     # check for model version
     if "model_version" in description_json:
         # check if model version is valid
-        if description_json["model_version"] not in model_list:
-            model_list_str = ", ".join(model_list)
+        if description_json["model_version"] not in MODEL_LIST:
+            model_list_str = ", ".join(MODEL_LIST)
             raise ValueError("Error channel_config model_version",
                              f"Invalid model version: {description_json['model_version']}.\nAllowed values: {model_list_str}")
         bot_logger.debug(
@@ -262,7 +266,7 @@ async def get_channel_config(channel: discord.TextChannel):
         # check if history length is valid
         if description_json["history_length"] == 0:
             description_json["history_length"] = None
-        elif description_json["history_length"] not in range(1, 100):
+        elif description_json["history_length"] not in range(1, MAX_HISTORY_LENGTH):
             raise ValueError("Error channel_config history_length",
                              f"Invalid history length: {description_json['history_length']}.\nAllowed values: 1-99, 0 for unlimited")
         bot_logger.debug(
@@ -273,7 +277,7 @@ async def get_channel_config(channel: discord.TextChannel):
         # check if image count max is valid
         if description_json["image_count_max"] == 0:
             description_json["image_count_max"] = None
-        elif description_json["image_count_max"] not in range(1, 100):
+        elif description_json["image_count_max"] not in range(1, MAX_IMAGE_COUNT):
             raise ValueError("Error channel_config image_count_max",
                              f"Invalid image count max: {description_json['image_count_max']}.\nAllowed values: 1-99, 0 for unlimited")
         bot_logger.debug(
@@ -295,20 +299,20 @@ async def get_channel_config(channel: discord.TextChannel):
 
     if "tools" in description_json:
         # Currently only handles built-in tools
-        if isinstance(description_json["tools"], list) and set(description_json["tools"]).issubset(allowed_tools):
+        if isinstance(description_json["tools"], list) and set(description_json["tools"]).issubset(ALLOWED_TOOLS):
             tool_list = list()
             for tool in description_json["tools"]:
                 tool_list.append({"type": tool})
             description_json["tools"] = tool_list # converted to built-in tool
         else:
             raise ValueError("Error channel_config tools",
-                             f"Invalid set of tools specified: {description_json["tools"]}.\nAllowed options: {allowed_tools}")
+                             f"Invalid set of tools specified: {description_json["tools"]}.\nAllowed options: {ALLOWED_TOOLS}")
         bot_logger.debug(f"Using tools: {description_json["tools"]}")
 
     if "tool_choice" in description_json:
-        if description_json["tool_choice"] not in allowed_choices:
+        if description_json["tool_choice"] not in ALLOWED_CHOICES:
             raise ValueError("Error channel_config tool_choice",
-                             f"Invalid tool choice: {description_json["tool_choice"]}.\nAllowed options: {allowed_choices}")
+                             f"Invalid tool choice: {description_json["tool_choice"]}.\nAllowed options: {ALLOWED_CHOICES}")
         bot_logger.debug(
             f"Using tool_choice: {description_json["tool_choice"]}")
 
@@ -400,11 +404,11 @@ def ignore_message(message: discord.Message) -> bool:
         bot_logger.debug("Bot detected")
         return True
     if message.guild is None or \
-            guild_id is not None and message.guild.id != int(guild_id):
+            GUILD_ID is not None and message.guild.id != int(GUILD_ID):
         bot_logger.debug(f"Wrong or no guild")
         return True
     if message.channel.category is None or \
-            category_id is not None and message.channel.category.id != int(category_id):
+            CATEGORY_ID is not None and message.channel.category.id != int(CATEGORY_ID):
         bot_logger.debug("Not in Category")
         return True
     if message.content.startswith('{') and message.content.endswith("}"):
@@ -417,4 +421,4 @@ def ignore_message(message: discord.Message) -> bool:
 
 
 if __name__ == "__main__":
-    client.run(discord_token)
+    client.run(DISCORD_TOKEN)
