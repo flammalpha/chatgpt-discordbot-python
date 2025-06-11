@@ -212,7 +212,7 @@ async def send_message_blocks(channel: discord.TextChannel, content: str):
             current_block = current_block[:max(last_line, last_period)]
             remaining_content = remaining_content[len(current_block):]
         bot_logger.info(
-            f"Sending message {(content-remaining_content)/MAX_MESSAGE_SIZE}/{content/MAX_MESSAGE_SIZE}")
+            f"Sending message {(len(content)-len(remaining_content))/MAX_MESSAGE_SIZE}/{len(content)/MAX_MESSAGE_SIZE}")
         await channel.send(current_block)
     await channel.send(remaining_content)
 
@@ -348,9 +348,9 @@ async def generate_messagehistory(channel: discord.TextChannel, history_length: 
             message_history.append({
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": message_content_without_url},
+                    {"type": "input_text", "text": message_content_without_url},
                     {
-                        "type": "image_url",
+                        "type": "input_image",
                         "image_url": {
                             "url": image_url
                         }
