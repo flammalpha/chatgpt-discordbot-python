@@ -37,3 +37,4 @@ Create a `config.json` file according to the `config.json.example` file and fill
 - [ChatGPT](https://chat.openai.com)
 - [ChatGPT API](https://platform.openai.com/docs/api-reference)
 - [Discord.py](https://discordpy.readthedocs.io/en/stable/)
+- [Discord.py Masterclass](https://fallendeity.github.io/discord.py-masterclass/slash-commands/)
