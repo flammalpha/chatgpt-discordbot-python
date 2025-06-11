@@ -9,6 +9,7 @@ import json
 from typing import Dict, List, Set
 import json
 import discord
+from discord.ext import commands
 from logging import getLogger
 from logging_config import setup_logger
 
@@ -25,6 +26,7 @@ with open('config.json', 'r') as config_file:
     config: Dict = json.load(config_file)
 
 # Config Items that never should be None
+COMMAND_PREFIX = config.get("command_prefix", "!")
 DISCORD_TOKEN = config.get("discord_token")
 OPENAI_TOKEN = config.get("openai_token")
 ELEVENLABS_TOKEN = config.get("elevenlabs_token")
@@ -45,7 +47,7 @@ MAX_MESSAGE_SIZE = 2000 # Discord message length maximum
 intents = discord.Intents.default()
 intents.message_content = True
 
-client = discord.Client(intents=intents)
+client = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
 chatgpt = Chat(OPENAI_TOKEN, MODEL_DEFAULT)
 elevenlabs = Voice(ELEVENLABS_TOKEN)
 

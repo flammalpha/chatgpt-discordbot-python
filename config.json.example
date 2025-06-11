@@ -1,4 +1,5 @@
 {
+    "command_prefix": "!",
     "openai_token": "",
     "elevenlabs_token": "",
     "discord_token": "",
