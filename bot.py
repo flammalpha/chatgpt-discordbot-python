@@ -206,10 +206,14 @@ async def send_message_blocks(channel: discord.TextChannel, content: str):
                 remaining_content[len(current_block) - 3:]
         # cut neatly on last period
         else:
-            last_line = current_block.rindex("\n")
-            last_period = current_block.rindex(". ") + 1  # include period
+            last_line = current_block.rfind("\n")
+            last_period = current_block.rfind(". ") + (1 if ". " in current_block else 0)  # include period
             # check what comes first - new line or period
-            current_block = current_block[:max(last_line, last_period)]
+            cutoff_index = max(last_line, last_period)
+            if cutoff_index < 1500: # somehow last period and new-line are more than 500 characters behind? reduce message waste
+                last_space = current_block.rfind(" ")
+                cutoff_index = max(last_space, cutoff_index)
+            current_block = current_block[:cutoff_index]
             remaining_content = remaining_content[len(current_block):]
         bot_logger.info(
             f"Sending message {(len(content)-len(remaining_content))/MAX_MESSAGE_SIZE}/{len(content)/MAX_MESSAGE_SIZE}")
