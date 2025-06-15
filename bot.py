@@ -43,6 +43,72 @@ MAX_HISTORY_LENGTH = config.get("max_history_length", 100)
 MAX_IMAGE_COUNT = config.get("max_image_count", 100)
 # Constants
 MAX_MESSAGE_SIZE = 2000  # Discord message length maximum
+PARAMETER_LIST = [
+    {
+        'name': 'image_count_max',
+        'description': "Amount of pictures to include in history (sending towards OpenAI).",
+        'category': "history",
+        'type': int,
+        'validator': lambda v: 0 <= v < 100,
+    },
+    {
+        'name': 'history_length',
+        'description': "Amount of messages to include in history (sending towards OpenAI).",
+        'category': "history",
+        'type': int,
+        'validator': lambda v: 0 <= v < 100,
+    },
+    {
+        'name': 'system_message',
+        'description': "Permanent system message the AI should adhere to (max 1000 characters).",
+        'category': "history",
+        'type': str,
+        'validator': lambda v: len(v) < 1000,
+    },
+    {
+        'name': 'sys_msg_order',
+        'description': "Weather the system message should be added as first or last message (Default last).",
+        'category': "history",
+        'type': str,
+        'options': ["first", "last"],
+    },
+    {
+        'name': 'model_version',
+        'description': "Model name for OpenAI (e.g. gpt-4.1).",
+        'category': "generation",
+        'type': str,
+        'options': MODEL_LIST,
+    },
+    {
+        'name': 'temperature',
+        'description': "Amount of fuzzyness the response should have (0.0=None, 1.0=Default, 2.0=Crazy).",
+        'category': "generation",
+        'type': float,
+        'validator': lambda v: 0.0 <= v <= 2.0,
+    },
+    {
+        'name': 'tools',
+        'description': "Tools to include in response generation (e.g. image_generation).",
+        'category': "generation",
+        'type': str,
+        'options': ALLOWED_TOOLS,
+    },
+    {
+        'name': 'tool_choice',
+        'description': "How the model should decide to use tools (default none).",
+        'category': "generation",
+        'type': str,
+        'options': ALLOWED_CHOICES,
+    },
+    {
+        'name': 'voice',
+        'description': "If the bot should be able to respond in voice channel from this chat.",
+        'category': 'bot',
+        'type': bool,
+        'options': [True, False],
+    }
+]
+
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -55,6 +121,8 @@ elevenlabs = Voice(ELEVENLABS_TOKEN)
 @client.event
 async def on_ready():
     bot_logger.info(f'We have logged in as {client.user}')
+    await client.tree.sync()
+    bot_logger.info(f'Synced all commands')
 
 
 @client.event
@@ -79,32 +147,21 @@ async def on_message(message: discord.Message):
             # generate ChatGPT prompt
             channel_config = await get_channel_config(message.channel)
 
-            history_parameter_list = ['image_count_max', 'history_length']
-            generation_parameter_list = [
-                'model_version', 'temperature', 'tools', 'tool_choice']
-
             history_parameters = dict()
             generation_parameters = dict()
 
             history_parameters = {key: channel_config.get(
-                key, None) if channel_config is not None else None for key in history_parameter_list}
+                key, None) if channel_config is not None else None
+                for key in
+                [key["name"] for key in PARAMETER_LIST if key["category"] == "history"]}
 
             message_history = await generate_messagehistory(
                 channel=message.channel, **history_parameters)
 
-            system_message = channel_config.get(
-                "system_message", None) if channel_config is not None else None
-
-            if system_message is not None:
-                if channel_config.get("sys_msg_order", None) == "first":
-                    message_history.insert(
-                        0, {"role": "system", "content": channel_config["system_message"]})
-                else:
-                    message_history.append(
-                        {"role": "system", "content": channel_config["system_message"]})
-
             generation_parameters = {key: channel_config.get(
-                key, None) if channel_config is not None else None for key in generation_parameter_list}
+                key, None) if channel_config is not None else None
+                for key in
+                [key["name"] for key in PARAMETER_LIST if key["category"] == "generation"]}
 
             response, images = await chatgpt.get_response_async(message_history, **generation_parameters)
 
@@ -246,7 +303,7 @@ def ensure_bool(value):
         f"{value} is not a boolean or a recognizable string boolean")
 
 
-async def get_channel_config(channel: discord.TextChannel):
+async def get_channel_config(channel: discord.TextChannel) -> dict:
     bot_logger.debug("Reading channel config from description")
     if channel.topic is None:
         return None
@@ -326,7 +383,7 @@ async def get_channel_config(channel: discord.TextChannel):
     return description_json
 
 
-async def generate_messagehistory(channel: discord.TextChannel, history_length: int = None, image_count_max: int = None):
+async def generate_messagehistory(channel: discord.TextChannel, system_message: str = None, sys_msg_order: str = None, history_length: int = None, image_count_max: int = None):
     bot_logger.debug("Reading message history")
     message_history: List[Dict] = []
     previous_author = 0
@@ -397,6 +454,15 @@ async def generate_messagehistory(channel: discord.TextChannel, history_length: 
 
     # reverse message history
     message_history.reverse()
+
+    if system_message is not None:
+        if sys_msg_order == "first":
+            message_history.insert(
+                0, {"role": "system", "content": system_message})
+        else:
+            message_history.append(
+                {"role": "system", "content": system_message})
+
     return message_history
 
 
