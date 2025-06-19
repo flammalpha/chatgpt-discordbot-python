@@ -413,12 +413,7 @@ async def generate_messagehistory(channel: discord.TextChannel, system_message: 
                 "role": "user",
                 "content": [
                     {"type": "input_text", "text": message_content_without_url},
-                    {
-                        "type": "input_image",
-                        "image_url": {
-                            "url": image_url
-                        }
-                    }
+                    {"type": "input_image", "image_url": image_url}
                 ]
             })
             image_count += 1
