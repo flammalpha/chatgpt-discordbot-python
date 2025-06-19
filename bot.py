@@ -1,4 +1,6 @@
 import base64
+import math
+import os
 from speech_generation import Voice
 from text_generation import Chat
 from static_ffmpeg import run
@@ -6,7 +8,7 @@ from io import BytesIO
 import re
 import asyncio
 import json
-from typing import Dict, List, Set
+from typing import Any, Callable, Dict, List, Optional, Set, TypedDict
 import json
 import discord
 from discord.ext import commands
@@ -43,7 +45,18 @@ MAX_HISTORY_LENGTH = config.get("max_history_length", 100)
 MAX_IMAGE_COUNT = config.get("max_image_count", 100)
 # Constants
 MAX_MESSAGE_SIZE = 2000  # Discord message length maximum
-PARAMETER_LIST = [
+
+
+class CustomParameter(TypedDict):
+    name: str
+    description: str
+    category: str
+    type: type
+    validator: Optional[Callable]
+    options: Optional[List[str]]
+
+
+PARAMETER_LIST: List[CustomParameter] = [
     {
         'name': 'image_count_max',
         'description': "Amount of pictures to include in history (sending towards OpenAI).",
@@ -105,7 +118,6 @@ PARAMETER_LIST = [
         'description': "If the bot should be able to respond in voice channel from this chat.",
         'category': 'bot',
         'type': bool,
-        'options': [True, False],
     }
 ]
 
@@ -116,6 +128,128 @@ intents.message_content = True
 client = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
 chatgpt = Chat(OPENAI_TOKEN, MODEL_DEFAULT)
 elevenlabs = Voice(ELEVENLABS_TOKEN)
+
+
+@client.tree.command()
+async def kill(context: discord.Interaction):
+    """Force stop the bot."""
+    await context.response.send_message("Shutting down...", ephemeral=True)
+    bot_logger.info("Bot is shutting down, requested"
+                    f" by user {context.user.name} ({context.user.id})"
+                    f" in guild {context.guild.name} ({context.guild.id})"
+                    f" in channel {context.channel.name} ({context.channel.id})")
+    try:
+        await asyncio.wait_for(client.close(), timeout=5)
+        bot_logger.info("Bot has shut down gracefully")
+    except asyncio.TimeoutError:
+        bot_logger.warning(
+            "Graceful shutdown timed out, force closing connections")
+        os._exit(0)
+
+
+@client.tree.command(name="config", description="Set a configuration option for the current channel.")
+@discord.app_commands.describe(
+    option="The configuration option to set",
+    value="The value to set for the configuration option"
+)
+@discord.app_commands.choices(
+    option=[
+        discord.app_commands.Choice(name=opt["name"], value=opt["name"])
+        for opt in PARAMETER_LIST
+    ]
+)
+async def config(
+    interaction: discord.Interaction,
+    option: discord.app_commands.Choice[str],
+    value: str
+):
+    """Set a configuration option for the current channel."""
+    # await interaction.response.defer()
+    config_option = get_config_option(option.value)
+    if not config_option:
+        return await interaction.response.send_message(f"Unknown option: {option.value}", ephemeral=True)
+
+    expected_type = config_option["type"]
+    try:
+        if expected_type is bool:
+            cast_value = ensure_bool(value)
+        elif expected_type is int:
+            cast_value = int(value)
+        elif expected_type is float:
+            cast_value = float(value)
+        elif expected_type is str:
+            cast_value = str(value)
+        else:
+            return await interaction.response.send_message(
+                f"Unsupported type for {option.value}: {expected_type.__name__}", ephemeral=True
+            )
+    except Exception:
+        return await interaction.response.send_message(
+            f"Value for {option.value} must be of type {expected_type.__name__}", ephemeral=True
+        )
+
+    if config_option.get("validator"):
+        valid, msg = config_option["validator"](cast_value)
+        if not valid:
+            return await interaction.response.send_message(
+                f"Validation failed: {msg}", ephemeral=True
+            )
+
+    await set_channel_config(interaction.channel, option.value, cast_value)
+    bot_logger.info(
+        f"Setting {option.value} to {cast_value} in channel {interaction.channel.name}")
+
+    await interaction.response.send_message(
+        f"Set `{option.value}` to `{cast_value}`!", ephemeral=True
+    )
+
+
+@config.autocomplete("value")
+async def config_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+):
+    """Provide autocomplete suggestions for configuration parameter."""
+    selected_option = interaction.data.get("options", [{}])[0].get("value")
+    if not selected_option:
+        return [discord.app_commands.Choice(name="Select an option", value="")]
+
+    config_option = get_config_option(selected_option)
+    if not config_option:
+        return [discord.app_commands.Choice(name="Unknown option", value="")]
+    if config_option.get("options"):
+        available_options = [
+            discord.app_commands.Choice(name=opt, value=opt)
+            for opt in config_option["options"]
+            if current.lower() in opt.lower()
+        ]
+        return available_options[:25]  # Limit to 25 choices
+    else:
+        # If the option is a boolean, provide True/False choices
+        if config_option["type"] is bool:
+            return [
+                discord.app_commands.Choice(name="True", value="True"),
+                discord.app_commands.Choice(name="False", value="False")
+            ]
+    return []
+
+
+@config.error
+async def config_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
+    """Handle errors for the config command."""
+    bot_logger.error(f"Error in config command: {error}", exc_info=True)
+    if isinstance(error, discord.app_commands.errors.MissingPermissions):
+        await interaction.response.send_message(
+            "You do not have permission to use this command.", ephemeral=True)
+    elif isinstance(error, discord.app_commands.errors.CommandInvokeError):
+        await interaction.response.send_message(
+            f"An error occurred while setting the configuration: {str(error)}", ephemeral=True)
+    elif isinstance(error, discord.app_commands.errors.CommandOnCooldown):
+        await interaction.response.send_message(
+            f"This command is on cooldown. Please try again later.", ephemeral=True)
+    else:
+        await interaction.response.send_message(
+            f"An unexpected error occurred: {str(error)}", ephemeral=True)
 
 
 @client.event
@@ -145,7 +279,7 @@ async def on_message(message: discord.Message):
         images = None
         try:
             # generate ChatGPT prompt
-            channel_config = await get_channel_config(message.channel)
+            channel_config = await check_channel_config(message.channel)
 
             history_parameters = dict()
             generation_parameters = dict()
@@ -252,31 +386,27 @@ async def send_message_blocks(channel: discord.TextChannel, content: str):
             current_block = current_block.rsplit(
                 "\n", 1)[0]  # split on last new line
         if current_block.count("```") % 2 > 0:
-            # gather language code if possible
             language_code = ""
             opening_bracket_index = current_block.rfind("```") + 3
             if opening_bracket_index > -1:
                 language_code = current_block[opening_bracket_index:].split("\n")[
                     0].split(" ")[0]
-            # add closing code brackets
             current_block = current_block + "```"
-            # add opening brackets to remaining content
             remaining_content = "```" + language_code + \
                 remaining_content[len(current_block) - 3:]
         # cut neatly on last period
         else:
             last_line = current_block.rfind("\n")
             last_period = current_block.rfind(
-                ". ") + (1 if ". " in current_block else 0)  # include period
-            # check what comes first - new line or period
+                ". ") + (1 if ". " in current_block else 0)
             cutoff_index = max(last_line, last_period)
             if cutoff_index < 1500:  # somehow last period and new-line are more than 500 characters behind? reduce message waste
                 last_space = current_block.rfind(" ")
                 cutoff_index = max(last_space, cutoff_index)
             current_block = current_block[:cutoff_index]
             remaining_content = remaining_content[len(current_block):]
-        bot_logger.info(
-            f"Sending message {(len(content)-len(remaining_content))/MAX_MESSAGE_SIZE}/{len(content)/MAX_MESSAGE_SIZE}")
+        bot_logger.info(f"Sending message {(math.ceil(len(content)-len(remaining_content))/MAX_MESSAGE_SIZE)}"
+                        f"/{math.ceil(len(content)/MAX_MESSAGE_SIZE)}")
         await channel.send(current_block)
     await channel.send(remaining_content)
 
@@ -295,69 +425,74 @@ def ensure_bool(value):
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
-        if value.lower() in ("true", "1", "yes"):
+        if value.lower() in ("true", "1", "yes", "on", "enabled", "active", "y"):
             return True
-        elif value.lower() in ("false", "0", "no"):
+        elif value.lower() in ("false", "0", "no", "off", "disabled", "inactive", "n"):
             return False
     raise ValueError(
         f"{value} is not a boolean or a recognizable string boolean")
 
 
-async def get_channel_config(channel: discord.TextChannel) -> dict:
-    bot_logger.debug("Reading channel config from description")
+async def fetch_channel_config(channel: discord.TextChannel) -> Optional[dict]:
+    """Fetches the channel configuration from the channel topic."""
+    bot_logger.debug("Fetching channel config from topic")
     if channel.topic is None:
         return None
-    # jsonify description
-    description_json = dict()
+    topic_json = dict()
     try:
-        description_json = json.loads(channel.topic, strict=False)
+        topic_json = json.loads(channel.topic, strict=False)
     except Exception as e:
-        bot_logger.error("Cannot parse channel status message", e)
-        raise ValueError(f"Cannot parse channel status message", e)
+        bot_logger.error("Cannot parse channel topic message", e)
+        raise ValueError(f"Cannot parse channel topic message", e)
 
-    # check for model version
+    return topic_json
+
+
+async def check_channel_config(channel: discord.TextChannel) -> dict:
+    bot_logger.debug("Checking channel config from description")
+
+    description_json = await fetch_channel_config(channel)
+    if description_json is None:
+        bot_logger.debug("No channel config found, using defaults")
+        return None
+
     if "model_version" in description_json:
-        # check if model version is valid
         if description_json["model_version"] not in MODEL_LIST:
             model_list_str = ", ".join(MODEL_LIST)
             raise ValueError("Error channel_config model_version",
-                             f"Invalid model version: {description_json['model_version']}.\nAllowed values: {model_list_str}")
+                             f"Invalid model version: {description_json['model_version']}."
+                             f"\nAllowed values: {model_list_str}")
         bot_logger.debug(
             f"Using model version: {description_json['model_version']}")
 
-    # check for message history length
     if "history_length" in description_json:
-        # check if history length is valid
         if description_json["history_length"] == 0:
             description_json["history_length"] = None
         elif description_json["history_length"] not in range(1, MAX_HISTORY_LENGTH):
             raise ValueError("Error channel_config history_length",
-                             f"Invalid history length: {description_json['history_length']}.\nAllowed values: 1-99, 0 for unlimited")
+                             f"Invalid history length: {description_json['history_length']}."
+                             f"\nAllowed values: 1-99, 0 for unlimited")
         bot_logger.debug(
             f"Using history length: {description_json['history_length']}")
 
-    # check for image count max
     if "image_count_max" in description_json:
-        # check if image count max is valid
         if description_json["image_count_max"] == 0:
             description_json["image_count_max"] = None
         elif description_json["image_count_max"] not in range(1, MAX_IMAGE_COUNT):
             raise ValueError("Error channel_config image_count_max",
-                             f"Invalid image count max: {description_json['image_count_max']}.\nAllowed values: 1-99, 0 for unlimited")
+                             f"Invalid image count max: {description_json['image_count_max']}."
+                             f"\nAllowed values: 1-99, 0 for unlimited")
         bot_logger.debug(
             f"Using image count max: {description_json['image_count_max']}")
 
-    # check for system message
     if "system_message" in description_json:
         bot_logger.debug(
             f"Using system message: {description_json['system_message']}")
 
-    # check for system message order
     if "sys_msg_order" in description_json:
         bot_logger.debug(
             f"Using system message order: {description_json['sys_msg_order']}")
 
-    # check if voice enabled
     if "voice" in description_json:
         description_json["voice"] = ensure_bool(description_json["voice"])
 
@@ -370,17 +505,46 @@ async def get_channel_config(channel: discord.TextChannel) -> dict:
             description_json["tools"] = tool_list  # converted to built-in tool
         else:
             raise ValueError("Error channel_config tools",
-                             f"Invalid set of tools specified: {description_json['tools']}.\nAllowed options: {ALLOWED_TOOLS}")
+                             f"Invalid set of tools specified: {description_json['tools']}."
+                             f"\nAllowed options: {ALLOWED_TOOLS}")
         bot_logger.debug(f"Using tools: {description_json['tools']}")
 
     if "tool_choice" in description_json:
         if description_json["tool_choice"] not in ALLOWED_CHOICES:
             raise ValueError("Error channel_config tool_choice",
-                             f"Invalid tool choice: {description_json['tool_choice']}.\nAllowed options: {ALLOWED_CHOICES}")
+                             f"Invalid tool choice: {description_json['tool_choice']}."
+                             f"\nAllowed options: {ALLOWED_CHOICES}")
         bot_logger.debug(
             f"Using tool_choice: {description_json['tool_choice']}")
 
     return description_json
+
+
+async def set_channel_config(channel: discord.TextChannel, key: str, value: Any) -> None:
+    '''Sets a channel config item in the channel topic'''
+    original_config = await fetch_channel_config(channel)
+    if original_config is None:
+        original_config = {}
+    if value is None:
+        if key in original_config:
+            del original_config[key]
+    else:
+        original_config[key] = value
+
+    channel_topic = json.dumps(original_config, ensure_ascii=False)
+    try:
+        bot_logger.debug(f"Setting channel topic to: {channel_topic}")
+        await channel.edit(topic=channel_topic)
+    except discord.Forbidden:
+        bot_logger.error("Cannot edit channel topic, missing permissions")
+        raise PermissionError("Cannot edit channel topic, missing permissions")
+
+
+def get_config_option(name: str):
+    for option in PARAMETER_LIST:
+        if option["name"] == name:
+            return option
+    return None
 
 
 async def generate_messagehistory(channel: discord.TextChannel, system_message: str = None, sys_msg_order: str = None, history_length: int = None, image_count_max: int = None):
@@ -389,14 +553,11 @@ async def generate_messagehistory(channel: discord.TextChannel, system_message: 
     previous_author = 0
     image_count = 0
     async for message in channel.history(limit=history_length):
-        # ignore messages starting with !! or too short
         if message.content.startswith("!!") or len(message.content) < 2:
             continue
-        # fetch message username
         message_user = None
         if message.author is not client.user:
             message_user = message.author.display_name.strip().replace(" ", "")
-        # check if message contains image
         image_url_regex = r"https?://[^\s]+\.(jpg|jpeg|png|gif)"
         image_match = re.search(image_url_regex, message.content)
         if (len(message.attachments) > 0 or image_match) and (image_count_max is None or image_count < image_count_max):
@@ -431,12 +592,10 @@ async def generate_messagehistory(channel: discord.TextChannel, system_message: 
                     "\n" + message_history[-1]["content"]
         # add new entry for different author
         else:
-            # check user or bot
             if message.author.id == client.user.id:
                 message_history.append(
                     {"role": "assistant", "content": message.content})
             else:
-                # check system message
                 if message.content.startswith('{') and message.content.endswith("}"):
                     message_history.append(
                         {"role": "system", "content": message.content[1:-1]})
